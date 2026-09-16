@@ -233,7 +233,7 @@ export default function DriverDrawer({
                 control={control}
                 name="email"
                 label="LOGIN EMAIL ADDRESS"
-                placeholder="e.g. driver.rajesh@quickbus.com"
+                placeholder="email"
               />
               <FormField
                 control={control}
