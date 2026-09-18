@@ -1,0 +1,8 @@
+export enum RoleAssignmentStatus {
+  ACTIVE = 'ACTIVE',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  SUSPENDED = 'SUSPENDED',
+  REVOKED = 'REVOKED',
+}
