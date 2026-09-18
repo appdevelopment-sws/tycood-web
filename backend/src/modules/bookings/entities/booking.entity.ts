@@ -29,7 +29,7 @@ export class Booking {
   id: string;
 
   @Index({ unique: true })
-  @Column({ name: 'booking_number', length: 50, unique: true })
+  @Column({ name: 'booking_number', type: 'varchar', length: 50, unique: true })
   bookingNumber: string;
 
   @Index()
@@ -115,7 +115,7 @@ export class Booking {
   })
   totalAmount: number;
 
-  @Column({ name: 'payment_method', length: 50, default: 'UPI' })
+  @Column({ name: 'payment_method', type: 'varchar', length: 50, default: 'UPI' })
   paymentMethod: string;
 
   @Index()
@@ -127,16 +127,16 @@ export class Booking {
   })
   paymentStatus: PaymentStatus;
 
-  @Column({ name: 'passenger_name', length: 150 })
+  @Column({ name: 'passenger_name', type: 'varchar', length: 150 })
   passengerName: string;
 
-  @Column({ name: 'passenger_phone', length: 50 })
+  @Column({ name: 'passenger_phone', type: 'varchar', length: 50 })
   passengerPhone: string;
 
   @Column({ name: 'pickup_notes', type: 'text', nullable: true })
   pickupNotes: string | null;
 
-  @Column({ length: 10 })
+  @Column({ type: 'varchar', length: 10 })
   otp: string;
 
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
@@ -154,19 +154,19 @@ export class Booking {
   driverProfileId: string | null;
 
   // Snapshot details of the booked ride for quick retrieval
-  @Column({ name: 'cab_name', length: 100, nullable: true })
+  @Column({ name: 'cab_name', type: 'varchar', length: 100, nullable: true })
   cabName: string | null;
 
-  @Column({ name: 'cab_category', length: 50, nullable: true })
+  @Column({ name: 'cab_category', type: 'varchar', length: 50, nullable: true })
   cabCategory: string | null;
 
-  @Column({ name: 'cab_plate_number', length: 50, nullable: true })
+  @Column({ name: 'cab_plate_number', type: 'varchar', length: 50, nullable: true })
   cabPlateNumber: string | null;
 
-  @Column({ name: 'driver_name', length: 150, nullable: true })
+  @Column({ name: 'driver_name', type: 'varchar', length: 150, nullable: true })
   driverName: string | null;
 
-  @Column({ name: 'driver_phone', length: 50, nullable: true })
+  @Column({ name: 'driver_phone', type: 'varchar', length: 50, nullable: true })
   driverPhone: string | null;
 
   @Column({

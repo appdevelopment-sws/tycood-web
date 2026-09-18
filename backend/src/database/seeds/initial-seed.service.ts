@@ -182,13 +182,16 @@ export class InitialSeedService implements OnApplicationBootstrap {
   private async seedFleetAndBookings() {
     // 1. Seed default customer user: rahul.kumar@gmail.com
     const customerEmail = 'rahul.kumar@gmail.com';
-    let customer = await this.userRepo.findOne({ where: { email: customerEmail } });
+    const customerPhone = '+919876543210';
+    let customer = await this.userRepo.findOne({
+      where: [{ email: customerEmail }, { phone: customerPhone }],
+    });
     if (!customer) {
       const passwordHash = await bcrypt.hash('UserPassword123!', 10);
       customer = this.userRepo.create({
         name: 'Rahul Kumar',
         email: customerEmail,
-        phone: '+919876543210',
+        phone: customerPhone,
         passwordHash,
         isActive: true,
         status: 'ACTIVE',
@@ -215,13 +218,16 @@ export class InitialSeedService implements OnApplicationBootstrap {
 
     // 2. Seed default driver: ramesh.driver@cabbooking.com
     const driverEmail = 'ramesh.driver@cabbooking.com';
-    let driverUser = await this.userRepo.findOne({ where: { email: driverEmail } });
+    const driverPhone = '+919835124789';
+    let driverUser = await this.userRepo.findOne({
+      where: [{ email: driverEmail }, { phone: driverPhone }],
+    });
     if (!driverUser) {
       const passwordHash = await bcrypt.hash('DriverPassword123!', 10);
       driverUser = this.userRepo.create({
         name: 'Ramesh Kumar',
         email: driverEmail,
-        phone: '+919835124789',
+        phone: driverPhone,
         passwordHash,
         isActive: true,
         status: 'ACTIVE',
@@ -248,19 +254,26 @@ export class InitialSeedService implements OnApplicationBootstrap {
       where: { userId: driverUser.id },
     });
     if (!driverProfile) {
-      driverProfile = this.driverRepo.create({
-        userId: driverUser.id,
-        licenseNumber: 'BR0120220034921',
-        licenseType: 'Commercial LMV Transport',
-        verificationStatus: VerificationStatus.VERIFIED,
-        availabilityStatus: AvailabilityStatus.AVAILABLE,
-        languages: ['Hindi', 'English', 'Bhojpuri'],
-        aadhaarVerified: true,
-        policeDeclarationAccepted: true,
-        codeOfConductAccepted: true,
+      const existingLicense = await this.driverRepo.findOne({
+        where: { licenseNumber: 'BR0120220034921' },
       });
-      driverProfile = await this.driverRepo.save(driverProfile);
-      this.logger.log(`Created verified driver profile for: ${driverUser.name}`);
+      if (!existingLicense) {
+        driverProfile = this.driverRepo.create({
+          userId: driverUser.id,
+          licenseNumber: 'BR0120220034921',
+          licenseType: 'Commercial LMV Transport',
+          verificationStatus: VerificationStatus.VERIFIED,
+          availabilityStatus: AvailabilityStatus.AVAILABLE,
+          languages: ['Hindi', 'English', 'Bhojpuri'],
+          aadhaarVerified: true,
+          policeDeclarationAccepted: true,
+          codeOfConductAccepted: true,
+        });
+        driverProfile = await this.driverRepo.save(driverProfile);
+        this.logger.log(`Created verified driver profile for: ${driverUser.name}`);
+      } else {
+        driverProfile = existingLicense;
+      }
     }
 
     // 3. Seed fleet vehicles
@@ -425,9 +438,14 @@ export class InitialSeedService implements OnApplicationBootstrap {
       ];
 
       for (const b of initialBookings) {
-        await this.bookingRepo.save(this.bookingRepo.create(b));
+        const existing = await this.bookingRepo.findOne({
+          where: { bookingNumber: b.bookingNumber },
+        });
+        if (!existing) {
+          await this.bookingRepo.save(this.bookingRepo.create(b));
+        }
       }
-      this.logger.log(`Seeded ${initialBookings.length} initial bookings for customer: ${customerEmail}`);
+      this.logger.log(`Seeded initial bookings for customer: ${customerEmail}`);
     }
   }
 }
