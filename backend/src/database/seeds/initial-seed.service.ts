@@ -2,11 +2,24 @@ import { Injectable, OnApplicationBootstrap, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Role } from '../../modules/users/entities/role.entity';
-import { User } from '../../modules/users/entities/user.entity';
-import { UserRole } from '../../modules/users/entities/user-role.entity';
-import { BusinessRole } from '../../common/enums/business-role.enum';
-import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
+import { Role } from '../../modules/users/entities/role.entity.js';
+import { User } from '../../modules/users/entities/user.entity.js';
+import { UserRole } from '../../modules/users/entities/user-role.entity.js';
+import { Vehicle } from '../../modules/drivers/entities/vehicle.entity.js';
+import { DriverProfile } from '../../modules/drivers/entities/driver-profile.entity.js';
+import { DriverVehicle } from '../../modules/drivers/entities/driver-vehicle.entity.js';
+import { Booking } from '../../modules/bookings/entities/booking.entity.js';
+import { BusinessRole } from '../../common/enums/business-role.enum.js';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum.js';
+import { VerificationStatus } from '../../common/enums/verification-status.enum.js';
+import { AvailabilityStatus } from '../../common/enums/availability-status.enum.js';
+import { VehicleStatus, DriverVehicleAssignmentStatus } from '../../common/enums/vehicle-status.enum.js';
+import {
+  BookingServiceType,
+  BookingStatus,
+  BookingTripType,
+  PaymentStatus,
+} from '../../common/enums/index.js';
 
 @Injectable()
 export class InitialSeedService implements OnApplicationBootstrap {
@@ -19,11 +32,20 @@ export class InitialSeedService implements OnApplicationBootstrap {
     private readonly userRepo: Repository<User>,
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
+    @InjectRepository(Vehicle)
+    private readonly vehicleRepo: Repository<Vehicle>,
+    @InjectRepository(DriverProfile)
+    private readonly driverRepo: Repository<DriverProfile>,
+    @InjectRepository(DriverVehicle)
+    private readonly driverVehicleRepo: Repository<DriverVehicle>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
   ) {}
 
   async onApplicationBootstrap() {
     await this.seedRoles();
     await this.seedAdmin();
+    await this.seedFleetAndBookings();
   }
 
   private async seedRoles() {
@@ -154,6 +176,258 @@ export class InitialSeedService implements OnApplicationBootstrap {
           }),
         );
       }
+    }
+  }
+
+  private async seedFleetAndBookings() {
+    // 1. Seed default customer user: rahul.kumar@gmail.com
+    const customerEmail = 'rahul.kumar@gmail.com';
+    let customer = await this.userRepo.findOne({ where: { email: customerEmail } });
+    if (!customer) {
+      const passwordHash = await bcrypt.hash('UserPassword123!', 10);
+      customer = this.userRepo.create({
+        name: 'Rahul Kumar',
+        email: customerEmail,
+        phone: '+919876543210',
+        passwordHash,
+        isActive: true,
+        status: 'ACTIVE',
+        city: 'Patna',
+        walletBalance: 850.0,
+      });
+      customer = await this.userRepo.save(customer);
+
+      const customerRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.CUSTOMER },
+      });
+      if (customerRole) {
+        await this.userRoleRepo.save(
+          this.userRoleRepo.create({
+            userId: customer.id,
+            roleId: customerRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+            approvedAt: new Date(),
+          }),
+        );
+      }
+      this.logger.log(`Created default customer: ${customerEmail}`);
+    }
+
+    // 2. Seed default driver: ramesh.driver@cabbooking.com
+    const driverEmail = 'ramesh.driver@cabbooking.com';
+    let driverUser = await this.userRepo.findOne({ where: { email: driverEmail } });
+    if (!driverUser) {
+      const passwordHash = await bcrypt.hash('DriverPassword123!', 10);
+      driverUser = this.userRepo.create({
+        name: 'Ramesh Kumar',
+        email: driverEmail,
+        phone: '+919835124789',
+        passwordHash,
+        isActive: true,
+        status: 'ACTIVE',
+        city: 'Patna',
+      });
+      driverUser = await this.userRepo.save(driverUser);
+
+      const driverRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.DRIVER },
+      });
+      if (driverRole) {
+        await this.userRoleRepo.save(
+          this.userRoleRepo.create({
+            userId: driverUser.id,
+            roleId: driverRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+            approvedAt: new Date(),
+          }),
+        );
+      }
+    }
+
+    let driverProfile = await this.driverRepo.findOne({
+      where: { userId: driverUser.id },
+    });
+    if (!driverProfile) {
+      driverProfile = this.driverRepo.create({
+        userId: driverUser.id,
+        licenseNumber: 'BR0120220034921',
+        licenseType: 'Commercial LMV Transport',
+        verificationStatus: VerificationStatus.VERIFIED,
+        availabilityStatus: AvailabilityStatus.AVAILABLE,
+        languages: ['Hindi', 'English', 'Bhojpuri'],
+        aadhaarVerified: true,
+        policeDeclarationAccepted: true,
+        codeOfConductAccepted: true,
+      });
+      driverProfile = await this.driverRepo.save(driverProfile);
+      this.logger.log(`Created verified driver profile for: ${driverUser.name}`);
+    }
+
+    // 3. Seed fleet vehicles
+    const fleet = [
+      {
+        registrationNumber: 'BR 01 EA 4521',
+        vehicleCategory: 'Sedan',
+        make: 'Maruti Suzuki',
+        model: 'Dzire Prime',
+        color: 'Pearl Arctic White',
+        fuelType: 'CNG + Petrol',
+        seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
+        registrationNumber: 'BR 01 CX 8842',
+        vehicleCategory: 'SUV / XL',
+        make: 'Toyota',
+        model: 'Innova Crysta 2.4 VX',
+        color: 'Super White',
+        fuelType: 'Diesel',
+        seatingCapacity: 7,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
+        registrationNumber: 'BR 01 EV 1092',
+        vehicleCategory: 'Electric (EV)',
+        make: 'Tata',
+        model: 'Tiago EV XT',
+        color: 'Teal Blue',
+        fuelType: 'Electric (EV)',
+        seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+    ];
+
+    for (const v of fleet) {
+      let vehicle = await this.vehicleRepo.findOne({
+        where: { registrationNumber: v.registrationNumber },
+      });
+      if (!vehicle) {
+        vehicle = this.vehicleRepo.create({
+          ...v,
+          ownerUserId: driverUser.id,
+        });
+        vehicle = await this.vehicleRepo.save(vehicle);
+
+        // Assign to driver
+        const existingAssignment = await this.driverVehicleRepo.findOne({
+          where: { driverProfileId: driverProfile.id, vehicleId: vehicle.id },
+        });
+        if (!existingAssignment) {
+          await this.driverVehicleRepo.save(
+            this.driverVehicleRepo.create({
+              driverProfileId: driverProfile.id,
+              vehicleId: vehicle.id,
+              isPrimary: v.vehicleCategory === 'Sedan',
+              assignmentStatus: DriverVehicleAssignmentStatus.ASSIGNED,
+            }),
+          );
+        }
+        this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
+      }
+    }
+
+    // 4. Seed initial bookings for customer
+    const existingBookingsCount = await this.bookingRepo.count({
+      where: { userId: customer.id },
+    });
+    if (existingBookingsCount === 0) {
+      const now = new Date();
+
+      const initialBookings = [
+        {
+          bookingNumber: '#CAB-84920',
+          userId: customer.id,
+          serviceType: BookingServiceType.CAB,
+          status: BookingStatus.ACTIVE,
+          tripType: BookingTripType.ONE_WAY,
+          pickupLocation: 'Jagdeopath, Patna, Bihar',
+          dropLocation: 'Danapur Railway Station, Patna',
+          intermediateStop: 'Bailey Road Crossing',
+          scheduledDateTime: new Date(now.getTime() + 15 * 60000),
+          baseFare: 1750,
+          platformFee: 100,
+          discountAmount: 0,
+          totalAmount: 1850,
+          paymentMethod: 'UPI (Google Pay)',
+          paymentStatus: PaymentStatus.COMPLETED,
+          passengerName: customer.name,
+          passengerPhone: customer.phone,
+          otp: '4829',
+          cabName: 'Toyota Innova Crysta',
+          cabCategory: 'Premier SUV',
+          cabPlateNumber: 'BR 01 EA 4521',
+          driverName: 'Ramesh Kumar',
+          driverPhone: '+91 98351 24789',
+          driverRating: 4.9,
+          driverProfileId: driverProfile.id,
+        },
+        {
+          bookingNumber: '#PRK-72910',
+          userId: customer.id,
+          serviceType: BookingServiceType.PARKING,
+          status: BookingStatus.UPCOMING,
+          tripType: BookingTripType.ONE_WAY,
+          pickupLocation: 'City Center Mall • Smart Parking, Fraser Road, Patna',
+          dropLocation: 'Bay P2-14 • Level B2 (Covered)',
+          scheduledDateTime: new Date(now.getTime() + 2 * 3600000),
+          baseFare: 210,
+          platformFee: 50,
+          discountAmount: 0,
+          totalAmount: 260,
+          paymentMethod: 'Fastag / Wallet',
+          paymentStatus: PaymentStatus.COMPLETED,
+          passengerName: customer.name,
+          passengerPhone: customer.phone,
+          otp: '7412',
+          cabName: 'Patna City Center Smart Parking',
+          cabCategory: 'Smart Parking Bay',
+          cabPlateNumber: 'BR 01 CX 8842',
+          driverName: 'Parking Operator Valet',
+          driverPhone: '+91 98000 11223',
+          driverRating: 4.8,
+          metadata: {
+            floor: 'Level B2 (Covered)',
+            bay: 'P2-14',
+            gatePin: '7412',
+            qrPayload: 'PARK_ACCESS_PRK72910_BAY_P2_14',
+            durationHours: 3,
+          },
+        },
+        {
+          bookingNumber: '#MEC-20914',
+          userId: customer.id,
+          serviceType: BookingServiceType.TECHNICIAN,
+          status: BookingStatus.COMPLETED,
+          tripType: BookingTripType.ONE_WAY,
+          pickupLocation: 'AIIMS Road, Phulwari Sharif, Patna',
+          dropLocation: 'Flat Tire Rapid Fix & Pressure Calibration',
+          scheduledDateTime: new Date(now.getTime() - 8 * 86400000),
+          baseFare: 249,
+          platformFee: 0,
+          discountAmount: 50,
+          totalAmount: 199,
+          paymentMethod: 'UPI (PhonePe)',
+          paymentStatus: PaymentStatus.COMPLETED,
+          passengerName: customer.name,
+          passengerPhone: customer.phone,
+          otp: '5512',
+          cabName: 'Flat Tire Rapid Fix',
+          cabCategory: 'Tire & Wheel Emergency',
+          cabPlateNumber: 'BR 01 BX 9201',
+          driverName: 'Md. Imran',
+          driverPhone: '+91 97711 44556',
+          driverRating: 5.0,
+          metadata: {
+            serviceTitle: 'Flat Tire Rapid Fix & Pressure Calibration',
+            symptomTags: ['Front Left Puncture', 'Pressure Loss'],
+          },
+        },
+      ];
+
+      for (const b of initialBookings) {
+        await this.bookingRepo.save(this.bookingRepo.create(b));
+      }
+      this.logger.log(`Seeded ${initialBookings.length} initial bookings for customer: ${customerEmail}`);
     }
   }
 }

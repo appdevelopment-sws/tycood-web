@@ -7,6 +7,7 @@ import { ApplicationsModule } from './modules/applications/applications.module';
 import { TechniciansModule } from './modules/technicians/technicians.module';
 import { DriversModule } from './modules/drivers/drivers.module';
 import { ParkingModule } from './modules/parking/parking.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -23,6 +24,7 @@ import { AppService } from './app.service';
     TechniciansModule,
     DriversModule,
     ParkingModule,
+    BookingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

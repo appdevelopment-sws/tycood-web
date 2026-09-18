@@ -5,3 +5,7 @@ export * from './verification-status.enum.js';
 export * from './availability-status.enum.js';
 export * from './vehicle-status.enum.js';
 export * from './parking-status.enum.js';
+export * from './booking-service-type.enum.js';
+export * from './booking-status.enum.js';
+export * from './booking-trip-type.enum.js';
+export * from './payment-status.enum.js';

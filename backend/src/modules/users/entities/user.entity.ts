@@ -15,6 +15,7 @@ import { TechnicianProfile } from '../../technicians/entities/technician-profile
 import { DriverProfile } from '../../drivers/entities/driver-profile.entity';
 import { ParkingOperator } from '../../parking/entities/parking-operator.entity';
 import { Vehicle } from '../../drivers/entities/vehicle.entity';
+import { Booking } from '../../bookings/entities/booking.entity';
 
 @Entity('users')
 export class User {
@@ -100,4 +101,7 @@ export class User {
 
   @OneToMany(() => Vehicle, (vehicle) => vehicle.owner)
   ownedVehicles: Vehicle[];
+
+  @OneToMany(() => Booking, (booking) => booking.user)
+  bookings: Booking[];
 }

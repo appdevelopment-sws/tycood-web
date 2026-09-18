@@ -9,6 +9,7 @@ import { Vehicle } from '../modules/drivers/entities/vehicle.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
 import { ParkingOperator } from '../modules/parking/entities/parking-operator.entity';
 import { ParkingLocation } from '../modules/parking/entities/parking-location.entity';
+import { Booking } from '../modules/bookings/entities/booking.entity';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -28,6 +29,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     DriverVehicle,
     ParkingOperator,
     ParkingLocation,
+    Booking,
   ],
   synchronize: process.env.NODE_ENV !== 'production', // Automatically creates tables in dev
   logging: process.env.NODE_ENV === 'development',
