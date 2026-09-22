@@ -37,22 +37,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       // Perform backend login directly
-      const data = await apiClient<{
-        accessToken: string
-        user?: {
-          id?: string
-          name?: string
-          email?: string
-          roles?: string[]
-          permissions?: string[]
-        }
-      }>("/auth/login", {
+      const data = await apiClient<any>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       })
 
-      if (data && data.accessToken) {
-        const u = data.user || {}
+      const authToken = data?.token || data?.accessToken
+      if (authToken) {
+        const u = data.user || data
         const roles = Array.isArray(u.roles) ? u.roles : []
         const primaryRole = roles[0] || "SUPER_ADMIN"
         const permissions =
@@ -73,11 +65,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           avatarUrl: defaultAvatar,
         }
 
-        setToken(data.accessToken)
+        setToken(authToken)
         setUser(adminUser)
         localStorage.setItem(
           APP_CONFIG.STORAGE_KEYS.AUTH_TOKEN,
-          data.accessToken
+          authToken
         )
         localStorage.setItem(
           APP_CONFIG.STORAGE_KEYS.AUTH_USER,
