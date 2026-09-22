@@ -299,6 +299,16 @@ export class InitialSeedService implements OnApplicationBootstrap {
         status: VehicleStatus.ACTIVE,
       },
       {
+        registrationNumber: 'BR 01 HB 3319',
+        vehicleCategory: 'Hatchback',
+        make: 'Maruti Suzuki',
+        model: 'WagonR ZXI',
+        color: 'Silky Silver',
+        fuelType: 'CNG + Petrol',
+        seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
         registrationNumber: 'BR 01 EV 1092',
         vehicleCategory: 'Electric (EV)',
         make: 'Tata',
@@ -306,6 +316,16 @@ export class InitialSeedService implements OnApplicationBootstrap {
         color: 'Teal Blue',
         fuelType: 'Electric (EV)',
         seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
+        registrationNumber: 'BR 01 LX 9999',
+        vehicleCategory: 'Luxury',
+        make: 'Toyota',
+        model: 'Fortuner 4x4 Legender',
+        color: 'Attitude Black',
+        fuelType: 'Diesel',
+        seatingCapacity: 7,
         status: VehicleStatus.ACTIVE,
       },
     ];
@@ -336,6 +356,126 @@ export class InitialSeedService implements OnApplicationBootstrap {
           );
         }
         this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
+      }
+    }
+
+    // 3b. Seed Delhi fleet & driver for multi-location testing
+    const delhiDriverEmail = 'vikram.driver@cabbooking.com';
+    const delhiDriverPhone = '+919811099234';
+    let delhiDriver = await this.userRepo.findOne({
+      where: [{ email: delhiDriverEmail }, { phone: delhiDriverPhone }],
+    });
+    if (!delhiDriver) {
+      const passwordHash = await bcrypt.hash('DriverPassword123!', 10);
+      delhiDriver = this.userRepo.create({
+        name: 'Vikram Singh',
+        email: delhiDriverEmail,
+        phone: delhiDriverPhone,
+        passwordHash,
+        isActive: true,
+        status: 'ACTIVE',
+        city: 'Delhi',
+      });
+      delhiDriver = await this.userRepo.save(delhiDriver);
+
+      const driverRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.DRIVER },
+      });
+      if (driverRole) {
+        await this.userRoleRepo.save(
+          this.userRoleRepo.create({
+            userId: delhiDriver.id,
+            roleId: driverRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+            approvedAt: new Date(),
+          }),
+        );
+      }
+    }
+
+    let delhiDriverProfile = await this.driverRepo.findOne({
+      where: { userId: delhiDriver.id },
+    });
+    if (!delhiDriverProfile) {
+      const existingDl = await this.driverRepo.findOne({
+        where: { licenseNumber: 'DL0420210088192' },
+      });
+      if (!existingDl) {
+        delhiDriverProfile = this.driverRepo.create({
+          userId: delhiDriver.id,
+          licenseNumber: 'DL0420210088192',
+          licenseType: 'Commercial LMV Transport',
+          verificationStatus: VerificationStatus.VERIFIED,
+          availabilityStatus: AvailabilityStatus.AVAILABLE,
+          languages: ['Hindi', 'English', 'Punjabi'],
+          aadhaarVerified: true,
+          policeDeclarationAccepted: true,
+          codeOfConductAccepted: true,
+        });
+        delhiDriverProfile = await this.driverRepo.save(delhiDriverProfile);
+      } else {
+        delhiDriverProfile = existingDl;
+      }
+    }
+
+    const delhiFleet = [
+      {
+        registrationNumber: 'DL 01 AA 2024',
+        vehicleCategory: 'Sedan',
+        make: 'Hyundai',
+        model: 'Aura CNG',
+        color: 'Titan Grey',
+        fuelType: 'CNG + Petrol',
+        seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
+        registrationNumber: 'DL 01 XY 7721',
+        vehicleCategory: 'SUV / XL',
+        make: 'Mahindra',
+        model: 'XUV700 AX7',
+        color: 'Midnight Black',
+        fuelType: 'Diesel',
+        seatingCapacity: 7,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
+        registrationNumber: 'DL 01 EV 9901',
+        vehicleCategory: 'Electric (EV)',
+        make: 'MG',
+        model: 'ZS EV Excite',
+        color: 'Candy White',
+        fuelType: 'Electric (EV)',
+        seatingCapacity: 4,
+        status: VehicleStatus.ACTIVE,
+      },
+    ];
+
+    for (const v of delhiFleet) {
+      let vehicle = await this.vehicleRepo.findOne({
+        where: { registrationNumber: v.registrationNumber },
+      });
+      if (!vehicle) {
+        vehicle = this.vehicleRepo.create({
+          ...v,
+          ownerUserId: delhiDriver.id,
+        });
+        vehicle = await this.vehicleRepo.save(vehicle);
+
+        const existingAssignment = await this.driverVehicleRepo.findOne({
+          where: { driverProfileId: delhiDriverProfile.id, vehicleId: vehicle.id },
+        });
+        if (!existingAssignment) {
+          await this.driverVehicleRepo.save(
+            this.driverVehicleRepo.create({
+              driverProfileId: delhiDriverProfile.id,
+              vehicleId: vehicle.id,
+              isPrimary: v.vehicleCategory === 'Sedan',
+              assignmentStatus: DriverVehicleAssignmentStatus.ASSIGNED,
+            }),
+          );
+        }
+        this.logger.log(`Seeded Delhi fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
       }
     }
 

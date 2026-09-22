@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, Brackets } from 'typeorm';
 import { Booking } from './entities/booking.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Vehicle } from '../drivers/entities/vehicle.entity.js';
@@ -44,37 +44,75 @@ export class BookingsService {
    * Search available cabs with dynamic distance estimation & pricing based on active fleet
    */
   async getAvailableCabs(query: AvailableCabsQueryDto) {
-    // 1. Fetch active registered vehicles
-    const vehicles = await this.vehicleRepo.find({
-      where: { status: VehicleStatus.ACTIVE },
-      relations: {
-        driverVehicles: {
-          driverProfile: {
-            user: true,
-          },
-        },
-      },
-    });
+    // 1. Extract requested city / search term from pickup location
+    const pickupLoc = (query.pickupLocation || '').trim();
+    // Extract candidate city token (e.g. from "Jagdeopath, Patna, Bihar" -> "patna", or direct city name)
+    const locationTokens = pickupLoc
+      .split(/[,–\-\/]/)
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 2);
+
+    // 2. Fetch active registered vehicles from database with driver & user relations
+    const queryBuilder = this.vehicleRepo
+      .createQueryBuilder('vehicle')
+      .leftJoinAndSelect('vehicle.driverVehicles', 'dv')
+      .leftJoinAndSelect('dv.driverProfile', 'driver')
+      .leftJoinAndSelect('driver.user', 'driverUser')
+      .where('vehicle.status = :status', { status: VehicleStatus.ACTIVE });
+
+    if (query.category && query.category.trim().toLowerCase() !== 'all') {
+      queryBuilder.andWhere('LOWER(vehicle.vehicleCategory) = LOWER(:cat)', {
+        cat: query.category.trim(),
+      });
+    }
+
+    // 3. Location-based matching: filter vehicles whose operating driver or owner operates in the requested city/area
+    if (locationTokens.length > 0) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          locationTokens.forEach((token, index) => {
+            const param = `loc_${index}`;
+            if (index === 0) {
+              qb.where(`LOWER(COALESCE(driverUser.city, 'Patna')) LIKE :${param}`, {
+                [param]: `%${token}%`,
+              });
+              qb.orWhere(`:pickupLoc ILIKE CONCAT('%', COALESCE(driverUser.city, 'Patna'), '%')`, {
+                pickupLoc: `%${pickupLoc}%`,
+              });
+            } else {
+              qb.orWhere(`LOWER(COALESCE(driverUser.city, 'Patna')) LIKE :${param}`, {
+                [param]: `%${token}%`,
+              });
+            }
+          });
+        }),
+      );
+    }
+
+    const vehicles = await queryBuilder.getMany();
 
     const isRoundTrip = query.tripType === BookingTripType.ROUND_TRIP;
     const isOutstation = query.tripType === BookingTripType.OUTSTATION;
     const distanceMultiplier = isRoundTrip ? 2.0 : isOutstation ? 1.4 : 1.0;
 
-    // Curated catalog templates mapped with real database vehicles if present
-    const defaultCatalog = [
+    // Helper category configurations for default specs/rates when not customized per-vehicle
+    const categoryDefaults: Record<
+      string,
       {
-        id: 'cab_sedan_1',
-        name: 'Maruti Suzuki Dzire',
-        category: 'Sedan',
-        modelSubtitle: 'Comfort Sedan • Top Partner Fleet',
-        imageAsset: 'assets/car.png',
-        rating: 4.88,
-        reviewsCount: 1420,
+        baseRate: number;
+        originalRate: number;
+        perKmRate: number;
+        luggageBags: number;
+        badgeTag: string;
+        features: string[];
+      }
+    > = {
+      Sedan: {
         baseRate: 649,
         originalRate: 799,
-        seats: 4,
+        perKmRate: 14.5,
         luggageBags: 2,
-        eta: '3 mins away',
+        badgeTag: 'BEST VALUE',
         features: [
           'AC Included',
           'Clean Cab',
@@ -82,26 +120,13 @@ export class BookingsService {
           'Toll Included',
           'Free Cancellation',
         ],
-        badgeTag: 'BEST VALUE',
-        perKmRate: 14.5,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
       },
-      {
-        id: 'cab_suv_1',
-        name: 'Toyota Innova Crysta',
-        category: 'SUV / XL',
-        modelSubtitle: 'Spacious Premier SUV • Long Distance Ideal',
-        imageAsset: 'assets/car.png',
-        rating: 4.95,
-        reviewsCount: 2890,
+      'SUV / XL': {
         baseRate: 1199,
         originalRate: 1399,
-        seats: 7,
+        perKmRate: 21.0,
         luggageBags: 4,
-        eta: '5 mins away',
+        badgeTag: 'SPACIOUS',
         features: [
           'Captain Seats',
           'Dual AC',
@@ -109,140 +134,84 @@ export class BookingsService {
           'Luggage Carrier',
           'Water Bottles',
         ],
-        badgeTag: 'SPACIOUS',
-        perKmRate: 21.0,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
       },
-      {
-        id: 'cab_suv_2',
-        name: 'Maruti Suzuki Ertiga',
-        category: 'SUV / XL',
-        modelSubtitle: 'Affordable 6-Seater Family Ride',
-        imageAsset: 'assets/car.png',
-        rating: 4.79,
-        reviewsCount: 840,
-        baseRate: 949,
-        originalRate: 1099,
-        seats: 6,
-        luggageBags: 3,
-        eta: '6 mins away',
-        features: [
-          'AC Included',
-          'Clean Cab',
-          '6 Passenger Seats',
-          'Top Partner',
-        ],
-        badgeTag: 'POPULAR',
-        perKmRate: 17.5,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
-      },
-      {
-        id: 'cab_hatch_1',
-        name: 'Maruti Suzuki WagonR',
-        category: 'Hatchback',
-        modelSubtitle: 'Pocket-Friendly City Express',
-        imageAsset: 'assets/car.png',
-        rating: 4.72,
-        reviewsCount: 630,
+      Hatchback: {
         baseRate: 499,
         originalRate: 599,
-        seats: 4,
+        perKmRate: 12.0,
         luggageBags: 1,
-        eta: '2 mins away',
+        badgeTag: 'FASTEST',
         features: [
           'Compact & Fast',
           'AC Included',
           'Best City Commute',
           'Instant Dispatch',
         ],
-        badgeTag: 'FASTEST',
-        perKmRate: 12.0,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
       },
-      {
-        id: 'cab_ev_1',
-        name: 'Tata Tiago EV',
-        category: 'Electric (EV)',
-        modelSubtitle: 'Eco-Friendly Zero Emission Glide',
-        imageAsset: 'assets/car.png',
-        rating: 4.85,
-        reviewsCount: 420,
+      'Electric (EV)': {
         baseRate: 549,
         originalRate: 649,
-        seats: 4,
+        perKmRate: 13.0,
         luggageBags: 2,
-        eta: '4 mins away',
+        badgeTag: 'ECO-FRIENDLY',
         features: [
           '100% Electric',
           'Silent Cabin',
           'Zero Emission',
           'AC Included',
         ],
-        badgeTag: 'ECO-FRIENDLY',
-        perKmRate: 13.0,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
       },
-      {
-        id: 'cab_lux_1',
-        name: 'Toyota Fortuner 4x4',
-        category: 'Luxury',
-        modelSubtitle: 'Executive VIP Chauffeur Service',
-        imageAsset: 'assets/car.png',
-        rating: 4.98,
-        reviewsCount: 510,
+      Luxury: {
         baseRate: 2499,
         originalRate: 2899,
-        seats: 7,
+        perKmRate: 35.0,
         luggageBags: 5,
-        eta: '8 mins away',
+        badgeTag: 'LUXURY',
         features: [
           'VIP Chauffeur in Uniform',
           'Complimentary Wi-Fi',
           'Leather Seating',
           'Refreshments Included',
         ],
-        badgeTag: 'LUXURY',
-        perKmRate: 35.0,
+      },
+    };
+
+    return vehicles.map((vehicle, idx) => {
+      const category = vehicle.vehicleCategory || 'Sedan';
+      const config = categoryDefaults[category] || categoryDefaults['Sedan'];
+
+      const assignedDriver = vehicle.driverVehicles?.[0]?.driverProfile;
+      const driverName = assignedDriver?.user?.name || 'Verified Partner Driver';
+      const driverRating = 4.85;
+
+      const calculatedFare = Math.round(config.baseRate * distanceMultiplier);
+      const calculatedOriginal = Math.round(config.originalRate * distanceMultiplier);
+
+      return {
+        id: vehicle.id,
+        vehicleId: vehicle.id,
+        name: `${vehicle.make} ${vehicle.model}`,
+        category: category,
+        modelSubtitle: `${category} • ${vehicle.fuelType || 'Comfort'} • ${vehicle.seatingCapacity} Seats`,
+        imageAsset: 'assets/car.png',
+        registrationNumber: vehicle.registrationNumber,
+        driverName: driverName,
+        rating: Number(driverRating) || 4.8,
+        reviewsCount: 120 + ((idx * 73) % 800),
+        fare: calculatedFare,
+        originalFare: calculatedOriginal,
+        baseRate: config.baseRate,
+        originalRate: config.originalRate,
+        seats: vehicle.seatingCapacity || 4,
+        luggageBags: config.luggageBags,
+        eta: `${2 + (idx % 6)} mins away`,
+        features: config.features,
+        badgeTag: config.badgeTag,
+        perKmRate: config.perKmRate,
         hasAc: true,
         isInstant: true,
         freeCancellation: true,
         tollIncluded: true,
-      },
-    ];
-
-    // Filter by category if requested
-    let cabs = defaultCatalog;
-    if (query.category && query.category !== 'All') {
-      cabs = cabs.filter(
-        (c) => c.category.toLowerCase() === query.category!.toLowerCase(),
-      );
-    }
-
-    // Apply distance multiplier and dynamically link registered vehicles if any
-    return cabs.map((cab, index) => {
-      const calculatedFare = Math.round(cab.baseRate * distanceMultiplier);
-      const calculatedOriginal = Math.round(cab.originalRate * distanceMultiplier);
-
-      const matchedVehicle = vehicles[index % (vehicles.length || 1)];
-
-      return {
-        ...cab,
-        fare: calculatedFare,
-        originalFare: calculatedOriginal,
-        vehicleId: matchedVehicle?.id || null,
-        registrationNumber: matchedVehicle?.registrationNumber || 'BR 01 EA 4521',
       };
     });
   }
