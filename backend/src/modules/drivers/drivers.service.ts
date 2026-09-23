@@ -82,19 +82,27 @@ export class DriversService {
   // --- Fleet / Vehicle CRUD Operations ---
 
   async createVehicle(ownerUserId: string | null, dto: CreateVehicleDto): Promise<Vehicle> {
+    const registrationNumber = (
+      dto.registrationNumber?.trim() ||
+      `CAB-${dto.vehicleCategory.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+    ).toUpperCase();
+
     const existing = await this.vehicleRepo.findOne({
-      where: { registrationNumber: dto.registrationNumber.toUpperCase() },
+      where: { registrationNumber },
     });
     if (existing) {
       throw new ConflictException(
-        `Vehicle with registration number ${dto.registrationNumber} already exists`,
+        `Cab/Vehicle with reference or registration number ${registrationNumber} already exists`,
       );
     }
 
     const vehicle = this.vehicleRepo.create({
       ...dto,
+      name: dto.name?.trim() || dto.vehicleCategory,
+      registrationNumber,
+      make: dto.make || 'Standard Fleet',
+      model: dto.model || 'Standard',
       ownerUserId: ownerUserId || undefined,
-      registrationNumber: dto.registrationNumber.toUpperCase(),
     });
     return this.vehicleRepo.save(vehicle);
   }

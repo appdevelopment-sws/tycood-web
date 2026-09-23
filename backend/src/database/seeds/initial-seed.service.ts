@@ -281,6 +281,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       {
         registrationNumber: 'BR 01 HB 3319',
         vehicleCategory: 'Hatchback',
+        name: 'Hatchback',
+        similarModels: 'Tata Tiago, Maruti WagonR or similar',
         make: 'Maruti Suzuki',
         model: 'WagonR ZXI',
         color: 'Silky Silver',
@@ -310,6 +312,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       {
         registrationNumber: 'BR 01 EA 4521',
         vehicleCategory: 'Sedan',
+        name: 'Sedan Prime',
+        similarModels: 'Maruti Dzire, Honda Amaze or similar',
         make: 'Maruti Suzuki',
         model: 'Dzire Prime',
         color: 'Pearl Arctic White',
@@ -339,6 +343,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       {
         registrationNumber: 'BR 01 CX 8842',
         vehicleCategory: 'SUV / XL',
+        name: 'SUV / XL',
+        similarModels: 'Mahindra Scorpio, Ertiga, Innova or similar',
         make: 'Toyota',
         model: 'Innova Crysta 2.4 VX',
         color: 'Super White',
@@ -368,6 +374,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       {
         registrationNumber: 'BR 01 EV 1092',
         vehicleCategory: 'Electric (EV)',
+        name: 'Electric (EV)',
+        similarModels: 'Tata Tiago EV, Tigor EV or similar',
         make: 'Tata',
         model: 'Tiago EV XT',
         color: 'Teal Blue',
@@ -397,6 +405,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       {
         registrationNumber: 'BR 01 LX 9999',
         vehicleCategory: 'Luxury',
+        name: 'Luxury Chauffeur',
+        similarModels: 'Toyota Camry, BMW, Mercedes or similar',
         make: 'Toyota',
         model: 'Camry Hybrid Executive',
         color: 'Attitude Black',

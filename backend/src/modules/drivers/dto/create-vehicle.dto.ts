@@ -19,20 +19,30 @@ export class CreateVehicleDto {
   @IsNotEmpty()
   vehicleCategory: string;
 
-  @ApiProperty({ example: 'Maruti Suzuki' })
+  @ApiPropertyOptional({ example: 'Hatchback Economy' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  make: string;
+  name?: string;
 
-  @ApiProperty({ example: 'WagonR ZXI' })
+  @ApiPropertyOptional({ example: 'Tata Tiago, Maruti WagonR or similar' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  model: string;
+  similarModels?: string;
 
-  @ApiProperty({ example: 'BR 01 HB 3319' })
+  @ApiPropertyOptional({ example: 'Maruti Suzuki' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  registrationNumber: string;
+  make?: string;
+
+  @ApiPropertyOptional({ example: 'WagonR ZXI' })
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiPropertyOptional({ example: 'BR 01 HB 3319' })
+  @IsOptional()
+  @IsString()
+  registrationNumber?: string;
 
   @ApiPropertyOptional({ example: 'Silky Silver' })
   @IsOptional()

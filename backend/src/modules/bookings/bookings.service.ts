@@ -207,12 +207,19 @@ export class BookingsService {
       const badgeTag = vehicle.badgeTag || config.badgeTag;
       const etaMinutes = vehicle.etaMinutes || (2 + (idx % 6));
 
+      const displayName = vehicle.name?.trim() || vehicle.vehicleCategory || `${vehicle.make} ${vehicle.model}`;
+      const similarHint = vehicle.similarModels?.trim()
+        ? `${vehicle.similarModels}`
+        : `${category} or similar`;
+      const modelSubtitle = `${similarHint} • ${vehicle.seatingCapacity} Seats`;
+
       return {
         id: vehicle.id,
         vehicleId: vehicle.id,
-        name: `${vehicle.make} ${vehicle.model}`,
+        name: displayName,
         category: category,
-        modelSubtitle: `${category} • ${vehicle.fuelType || 'Comfort'} • ${vehicle.seatingCapacity} Seats`,
+        similarModels: vehicle.similarModels || similarHint,
+        modelSubtitle: modelSubtitle,
         imageAsset: vehicle.imageUrl || 'assets/car.png',
         registrationNumber: vehicle.registrationNumber,
         driverName: driverName,

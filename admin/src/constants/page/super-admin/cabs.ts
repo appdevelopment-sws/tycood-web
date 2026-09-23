@@ -1,11 +1,13 @@
 import type { CreateCabPayload } from "@/types/cab"
 
 export const CAB_FORM_INITIAL_DATA: CreateCabPayload = {
-  make: "Maruti Suzuki",
-  model: "WagonR ZXI",
-  registrationNumber: "",
   vehicleCategory: "Hatchback",
-  color: "Silky Silver",
+  name: "Hatchback",
+  similarModels: "Tata Tiago, Maruti WagonR or similar",
+  make: "",
+  model: "",
+  registrationNumber: "",
+  color: "",
   manufacturingYear: String(new Date().getFullYear()),
   fuelType: "CNG + Petrol",
   seatingCapacity: 4,

@@ -27,13 +27,19 @@ export class Vehicle {
   @Column({ name: 'owner_user_id', type: 'uuid', nullable: true })
   ownerUserId: string;
 
-  @Column({ name: 'vehicle_category', length: 50, default: 'Sedan Prime' })
+  @Column({ name: 'vehicle_category', length: 50, default: 'Sedan' })
   vehicleCategory: string;
 
-  @Column({ length: 100, default: 'Maruti Suzuki' })
+  @Column({ length: 150, nullable: true })
+  name: string;
+
+  @Column({ name: 'similar_models', length: 255, nullable: true })
+  similarModels: string;
+
+  @Column({ length: 100, nullable: true, default: 'Standard Fleet' })
   make: string;
 
-  @Column({ length: 100, default: 'Dzire' })
+  @Column({ length: 100, nullable: true, default: 'Standard' })
   model: string;
 
   @Index({ unique: true })
@@ -61,7 +67,11 @@ export class Vehicle {
   @Column({ name: 'insurance_policy_number', length: 100, nullable: true })
   insurancePolicyNumber: string;
 
-  @Column({ name: 'permit_type', length: 100, default: 'All India Tourist Permit' })
+  @Column({
+    name: 'permit_type',
+    length: 100,
+    default: 'All India Tourist Permit',
+  })
   permitType: string;
 
   @Column({ name: 'rc_photo_uploaded', type: 'boolean', default: false })
@@ -152,7 +162,7 @@ export class Vehicle {
   originalFare: number;
 
   // --- App Card Presentation & Features ---
-  @Column({ name: 'badge_tag', length: 50, nullable: true })
+  @Column({ name: 'badge_tag', type: 'varchar', length: 50, nullable: true })
   badgeTag: string | null;
 
   @Column({
@@ -171,7 +181,7 @@ export class Vehicle {
   @Column({ name: 'eta_minutes', type: 'int', default: 5 })
   etaMinutes: number;
 
-  @Column({ name: 'image_url', length: 500, nullable: true })
+  @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
   imageUrl: string | null;
 
   @Column({ type: 'jsonb', nullable: true, default: () => "'[]'::jsonb" })
@@ -203,7 +213,10 @@ export class Vehicle {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @ManyToOne(() => User, (user) => user.ownedVehicles, { onDelete: 'SET NULL', nullable: true })
+  @ManyToOne(() => User, (user) => user.ownedVehicles, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
   @JoinColumn({ name: 'owner_user_id' })
   owner: User;
 

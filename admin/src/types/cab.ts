@@ -11,8 +11,10 @@ export interface CabVehicle {
   id: string
   ownerUserId?: string
   vehicleCategory: string
-  make: string
-  model: string
+  name?: string
+  similarModels?: string
+  make?: string
+  model?: string
   registrationNumber: string
   color?: string
   manufacturingYear?: string
@@ -57,9 +59,11 @@ export interface CabVehicle {
 
 export interface CreateCabPayload {
   vehicleCategory: string
-  make: string
-  model: string
-  registrationNumber: string
+  name?: string
+  similarModels?: string
+  make?: string
+  model?: string
+  registrationNumber?: string
   color?: string
   manufacturingYear?: string
   fuelType?: string

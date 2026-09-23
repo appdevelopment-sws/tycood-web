@@ -64,14 +64,18 @@ export const CabTypePage = () => {
   const columns: Column<CabVehicle>[] = useMemo(() => {
     return [
       {
-        header: "Vehicle & Model",
-        accessorKey: "make",
+        header: "Cab Type & Representative Cars",
+        accessorKey: "name",
         cell: (row) => (
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-14 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900">
               <img
-                src={row.imageUrl?.startsWith("http") ? row.imageUrl : "/assets/car.png"}
-                alt={row.model}
+                src={
+                  row.imageUrl?.startsWith("http")
+                    ? row.imageUrl
+                    : "/assets/car.png"
+                }
+                alt={row.name || row.vehicleCategory}
                 className="max-h-full max-w-full object-contain"
                 onError={(e) => {
                   ;(e.target as HTMLElement).style.display = "none"
@@ -81,7 +85,7 @@ export const CabTypePage = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  {row.make} {row.model}
+                  {row.name || row.vehicleCategory}
                 </span>
                 {row.badgeTag && (
                   <span className="rounded bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] font-bold text-orange-600 dark:text-orange-400">
@@ -89,8 +93,11 @@ export const CabTypePage = () => {
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                {row.registrationNumber} • {row.color || "Standard"}
+              <div className="text-[11.5px] font-medium text-amber-700 dark:text-amber-400">
+                {row.similarModels || `${row.vehicleCategory} or similar`}
+              </div>
+              <div className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500">
+                Ref: {row.registrationNumber}
               </div>
             </div>
           </div>
@@ -120,7 +127,9 @@ export const CabTypePage = () => {
         cell: (row) => (
           <div>
             <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
-              <span className="text-emerald-600 dark:text-emerald-400">₹{row.baseFare}</span>
+              <span className="text-emerald-600 dark:text-emerald-400">
+                ₹{row.baseFare}
+              </span>
               {row.originalFare && row.originalFare > row.baseFare && (
                 <span className="text-[11px] text-slate-400 line-through">
                   ₹{row.originalFare}
@@ -153,11 +162,11 @@ export const CabTypePage = () => {
             <div className="flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-400">
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
               <span>{row.rating || 4.8}</span>
-              <span className="text-[10px] text-slate-400 font-normal">
+              <span className="text-[10px] font-normal text-slate-400">
                 ({row.reviewsCount || 412})
               </span>
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+            <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
               ⏱ ~{row.etaMinutes || 6} mins away
             </div>
           </div>
@@ -250,18 +259,27 @@ export const CabTypePage = () => {
               className="w-[280px]"
             />
 
-            {/* Category Filter */}
+            {/* Dynamic Category Filter */}
             <select
               value={filter.category || "ALL"}
               onChange={(e) => handleFilterChange({ category: e.target.value })}
               className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs text-slate-900 transition outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100"
             >
-              <option value="ALL">All Categories</option>
-              <option value="Hatchback">Hatchback</option>
-              <option value="Sedan">Sedan</option>
-              <option value="SUV / XL">SUV / XL</option>
-              <option value="Electric (EV)">Electric (EV)</option>
-              <option value="Luxury">Luxury</option>
+              <option value="ALL">All Cab Types</option>
+              {Array.from(
+                new Set([
+                  "Hatchback",
+                  "Sedan",
+                  "SUV / XL",
+                  "Electric (EV)",
+                  "Luxury",
+                  ...cabs.map((c) => c.vehicleCategory).filter(Boolean),
+                ])
+              ).map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
 
             {/* Fuel Type Filter */}

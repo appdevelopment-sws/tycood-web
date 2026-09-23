@@ -11,13 +11,13 @@ import {
   FormSelectField,
   FormCheckboxField,
 } from "@/components/ui/form-fields"
+import { FileUpload } from "@/components/common/FileUpload"
 import sectionHeader from "@/components/sectionHeader"
 import { queryKeys } from "@/lib/queryKeys"
 import { cabService } from "@/services/cabService"
 import type { CabVehicle, CreateCabPayload } from "@/types/cab"
 import {
   CAB_FORM_INITIAL_DATA,
-  CAB_CATEGORY_OPTIONS,
   CAB_STATUS_OPTIONS,
   CAB_FUEL_OPTIONS,
   BADGE_TAG_OPTIONS,
@@ -61,12 +61,15 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
         setFeaturesList(initialFeatures)
 
         reset({
-          make: cab?.make ?? "Maruti Suzuki",
-          model: cab?.model ?? "WagonR ZXI",
-          registrationNumber: cab?.registrationNumber ?? "",
           vehicleCategory: cab?.vehicleCategory ?? "Hatchback",
-          color: cab?.color ?? "Silky Silver",
-          manufacturingYear: cab?.manufacturingYear ?? "2023",
+          name: cab?.name ?? "Hatchback",
+          similarModels:
+            cab?.similarModels ?? "Tata Tiago, Maruti WagonR or similar",
+          make: cab?.make ?? "",
+          model: cab?.model ?? "",
+          registrationNumber: cab?.registrationNumber ?? "",
+          color: cab?.color ?? "",
+          manufacturingYear: cab?.manufacturingYear ?? "2024",
           fuelType: cab?.fuelType ?? "CNG + Petrol",
           seatingCapacity: cab?.seatingCapacity ?? 4,
           luggageCapacity: cab?.luggageCapacity ?? 1,
@@ -152,10 +155,14 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
 
   const onSubmit: SubmitHandler<CreateCabPayload> = (data) => {
     const payload: CreateCabPayload = {
-      make: data.make,
-      model: data.model,
-      registrationNumber: data.registrationNumber.toUpperCase(),
       vehicleCategory: data.vehicleCategory,
+      name: data.name || data.vehicleCategory,
+      similarModels: data.similarModels,
+      make: data.make || "Standard Fleet",
+      model: data.model || "Standard",
+      registrationNumber: data.registrationNumber?.trim()
+        ? data.registrationNumber.toUpperCase()
+        : undefined,
       color: data.color || undefined,
       manufacturingYear: data.manufacturingYear || undefined,
       fuelType: data.fuelType,
@@ -295,10 +302,12 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
 
             <div className="flex-1">
               <div className="text-base font-bold text-slate-900 dark:text-slate-100">
-                {watchedValues.make || "Maruti Suzuki"} {watchedValues.model || "WagonR ZXI"}
+                {watchedValues.name || watchedValues.vehicleCategory || "Hatchback"}
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                {watchedValues.vehicleCategory || "Hatchback"} •{" "}
+              <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                {watchedValues.similarModels || "Tata Tiago, WagonR or similar"}
+              </div>
+              <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {watchedValues.fuelType || "CNG + Petrol"} •{" "}
                 {watchedValues.seatingCapacity || 4} Seats
               </div>
@@ -357,43 +366,74 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
       </div>
 
       <form id="cab-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Section 01: Vehicle Identity & Hardware */}
+        {/* Section 01: Cab Type & Representative Vehicles */}
         <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-          {sectionHeader("01", "Vehicle Identity & Model Details")}
+          {sectionHeader("01", "Cab Type & Representative Specification")}
+          <p className="mb-4 text-xs text-slate-500">
+            Define the general cab tier users can book (e.g. Hatchback, SUV) with indicative models shown as &quot;similar like Tiago or Scorpio&quot;. No fixed brand name required.
+          </p>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-1.5">
+              <FormField
+                control={control}
+                name="vehicleCategory"
+                label="CAB TYPE / CATEGORY"
+                placeholder="e.g. Hatchback, SUV, Sedan, Mini, Tempo Traveller"
+                required
+                readOnly={isViewMode}
+              />
+              <p className="text-[11px] text-slate-400">
+                Type any category or select:{" "}
+                <button
+                  type="button"
+                  onClick={() => setValue("vehicleCategory", "Hatchback")}
+                  className="font-medium text-amber-600 underline hover:text-amber-700"
+                >
+                  Hatchback
+                </button>
+                ,{" "}
+                <button
+                  type="button"
+                  onClick={() => setValue("vehicleCategory", "Sedan")}
+                  className="font-medium text-amber-600 underline hover:text-amber-700"
+                >
+                  Sedan
+                </button>
+                ,{" "}
+                <button
+                  type="button"
+                  onClick={() => setValue("vehicleCategory", "SUV / XL")}
+                  className="font-medium text-amber-600 underline hover:text-amber-700"
+                >
+                  SUV / XL
+                </button>
+                ,{" "}
+                <button
+                  type="button"
+                  onClick={() => setValue("vehicleCategory", "Electric (EV)")}
+                  className="font-medium text-amber-600 underline hover:text-amber-700"
+                >
+                  EV
+                </button>
+              </p>
+            </div>
+
             <FormField
               control={control}
-              name="make"
-              label="VEHICLE MAKE / BRAND"
-              placeholder="e.g. Maruti Suzuki, Toyota, Hyundai"
+              name="name"
+              label="CAB TYPE DISPLAY NAME"
+              placeholder="e.g. Hatchback Economy, Prime SUV"
               required
               readOnly={isViewMode}
             />
 
             <FormField
               control={control}
-              name="model"
-              label="MODEL & TRIM"
-              placeholder="e.g. WagonR ZXI, Dzire VXi, Innova Crysta"
+              name="similarModels"
+              label="REPRESENTATIVE CARS (OR SIMILAR)"
+              placeholder="e.g. Tata Tiago, WagonR or similar / Scorpio, Ertiga"
               required
-              readOnly={isViewMode}
-            />
-
-            <FormField
-              control={control}
-              name="registrationNumber"
-              label="REGISTRATION PLATE"
-              placeholder="e.g. BR 01 HB 3319"
-              required
-              readOnly={isViewMode}
-            />
-
-            <FormSelectField
-              control={control}
-              name="vehicleCategory"
-              label="VEHICLE CATEGORY"
-              options={CAB_CATEGORY_OPTIONS}
               readOnly={isViewMode}
             />
 
@@ -405,26 +445,10 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
               readOnly={isViewMode}
             />
 
-            <FormField
-              control={control}
-              name="color"
-              label="VEHICLE COLOR"
-              placeholder="e.g. Silky Silver, Arctic White"
-              readOnly={isViewMode}
-            />
-
-            <FormField
-              control={control}
-              name="manufacturingYear"
-              label="MANUFACTURING YEAR"
-              placeholder="e.g. 2023"
-              readOnly={isViewMode}
-            />
-
             <FormSelectField
               control={control}
               name="status"
-              label="FLEET STATUS"
+              label="CAB TIER STATUS"
               options={CAB_STATUS_OPTIONS}
               readOnly={isViewMode}
             />
@@ -432,10 +456,42 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
             <FormField
               control={control}
               name="permitType"
-              label="PERMIT TYPE"
+              label="PERMIT / OPERATION TYPE"
               placeholder="e.g. All India Tourist Permit"
               readOnly={isViewMode}
             />
+          </div>
+
+          {/* Optional Individual Fleet Reference Details */}
+          <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              Optional Physical Fleet Identifier (For Tracking, Leave blank to auto-generate)
+            </span>
+            <div className="mt-3 grid gap-4 sm:grid-cols-3">
+              <FormField
+                control={control}
+                name="registrationNumber"
+                label="OPTIONAL REGISTRATION REF"
+                placeholder="Optional e.g. BR 01 HB 3319 or auto-generated"
+                readOnly={isViewMode}
+              />
+
+              <FormField
+                control={control}
+                name="make"
+                label="OPTIONAL BRAND / MAKE"
+                placeholder="Optional e.g. Maruti, Tata, Mahindra"
+                readOnly={isViewMode}
+              />
+
+              <FormField
+                control={control}
+                name="model"
+                label="OPTIONAL MODEL"
+                placeholder="Optional e.g. WagonR, Scorpio"
+                readOnly={isViewMode}
+              />
+            </div>
           </div>
         </div>
 
@@ -569,12 +625,40 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
               readOnly={isViewMode}
             />
 
-            <div className="sm:col-span-2 lg:col-span-4">
+            {/* Image Upload & URL input */}
+            <div className="sm:col-span-2 lg:col-span-4 space-y-3">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                Cab Vehicle Image (Upload file or enter URL/asset path)
+              </label>
+
+              {!isViewMode && (
+                <div className="mb-2">
+                  <FileUpload
+                    label="Upload Vehicle Image"
+                    helperText="Upload JPG, PNG or WebP car image"
+                    accept="image/*"
+                    multiple={false}
+                    disabled={isViewMode}
+                    readOnly={isViewMode}
+                    onChange={(res) => {
+                      if (res) {
+                        const url = Array.isArray(res)
+                          ? res[0]?.url || res[0]
+                          : res.url || res
+                        if (url) {
+                          setValue("imageUrl", url)
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               <FormField
                 control={control}
                 name="imageUrl"
-                label="VEHICLE IMAGE URL / ASSET PATH"
-                placeholder="e.g. assets/car.png or https://example.com/wagonr.png"
+                label="CURRENT IMAGE URL / ASSET PATH"
+                placeholder="e.g. assets/car.png or https://example.com/cab.png"
                 readOnly={isViewMode}
               />
             </div>

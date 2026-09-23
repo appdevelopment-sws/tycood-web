@@ -8,6 +8,7 @@ import { TechniciansModule } from './modules/technicians/technicians.module';
 import { DriversModule } from './modules/drivers/drivers.module';
 import { ParkingModule } from './modules/parking/parking.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -25,6 +26,7 @@ import { AppService } from './app.service';
     DriversModule,
     ParkingModule,
     BookingsModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
