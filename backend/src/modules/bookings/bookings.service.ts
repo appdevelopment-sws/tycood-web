@@ -182,10 +182,30 @@ export class BookingsService {
 
       const assignedDriver = vehicle.driverVehicles?.[0]?.driverProfile;
       const driverName = assignedDriver?.user?.name || 'Verified Partner Driver';
-      const driverRating = 4.85;
+      const driverRating = vehicle.rating || 4.8;
 
-      const calculatedFare = Math.round(config.baseRate * distanceMultiplier);
-      const calculatedOriginal = Math.round(config.originalRate * distanceMultiplier);
+      // Use vehicle configured pricing or fallback to category defaults
+      const baseFare = Number(vehicle.baseFare) || config.baseRate;
+      const originalFare = Number(vehicle.originalFare) || config.originalRate;
+      const perKmRate = Number(vehicle.perKmCharge) || config.perKmRate;
+      const extraKmCharge = Number(vehicle.extraKmCharge) || (perKmRate + 3);
+      const roundoffCostPerKm = Number(vehicle.roundoffCostPerKm) || (perKmRate - 1);
+      const outstationBaseCharge = Number(vehicle.outstationBaseCharge) || (baseFare * 3);
+      const outstationPerKmCharge = Number(vehicle.outstationPerKmCharge) || (perKmRate + 2);
+
+      const calculatedFare = Math.round(
+        (isOutstation ? outstationBaseCharge : baseFare) * distanceMultiplier,
+      );
+      const calculatedOriginal = Math.round(
+        (isOutstation ? outstationBaseCharge * 1.2 : originalFare) * distanceMultiplier,
+      );
+
+      const features = Array.isArray(vehicle.features) && vehicle.features.length > 0
+        ? vehicle.features
+        : config.features;
+
+      const badgeTag = vehicle.badgeTag || config.badgeTag;
+      const etaMinutes = vehicle.etaMinutes || (2 + (idx % 6));
 
       return {
         id: vehicle.id,
@@ -193,25 +213,30 @@ export class BookingsService {
         name: `${vehicle.make} ${vehicle.model}`,
         category: category,
         modelSubtitle: `${category} • ${vehicle.fuelType || 'Comfort'} • ${vehicle.seatingCapacity} Seats`,
-        imageAsset: 'assets/car.png',
+        imageAsset: vehicle.imageUrl || 'assets/car.png',
         registrationNumber: vehicle.registrationNumber,
         driverName: driverName,
-        rating: Number(driverRating) || 4.8,
-        reviewsCount: 120 + ((idx * 73) % 800),
+        rating: Number(driverRating),
+        reviewsCount: vehicle.reviewsCount || (120 + ((idx * 73) % 800)),
         fare: calculatedFare,
         originalFare: calculatedOriginal,
-        baseRate: config.baseRate,
-        originalRate: config.originalRate,
+        baseRate: baseFare,
+        originalRate: originalFare,
+        baseKm: Number(vehicle.baseKm) || 10,
+        perKmRate: perKmRate,
+        extraKmCharge: extraKmCharge,
+        roundoffCostPerKm: roundoffCostPerKm,
+        outstationBaseCharge: outstationBaseCharge,
+        outstationPerKmCharge: outstationPerKmCharge,
         seats: vehicle.seatingCapacity || 4,
-        luggageBags: config.luggageBags,
-        eta: `${2 + (idx % 6)} mins away`,
-        features: config.features,
-        badgeTag: config.badgeTag,
-        perKmRate: config.perKmRate,
-        hasAc: true,
-        isInstant: true,
-        freeCancellation: true,
-        tollIncluded: true,
+        luggageBags: vehicle.luggageCapacity || config.luggageBags,
+        eta: `${etaMinutes} mins away`,
+        features: features,
+        badgeTag: badgeTag,
+        hasAc: vehicle.hasAc ?? true,
+        isInstant: vehicle.isInstant ?? true,
+        freeCancellation: vehicle.freeCancellation ?? true,
+        tollIncluded: vehicle.tollIncluded ?? true,
       };
     });
   }

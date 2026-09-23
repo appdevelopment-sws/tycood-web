@@ -10,6 +10,8 @@ import { DriverProfile } from './entities/driver-profile.entity';
 import { Vehicle } from './entities/vehicle.entity';
 import { DriverVehicle } from './entities/driver-vehicle.entity';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { QueryVehiclesDto } from './dto/query-vehicles.dto';
 import { AssignVehicleDto } from './dto/assign-vehicle.dto';
 import { QueryDriversDto } from './dto/query-drivers.dto';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
@@ -77,7 +79,9 @@ export class DriversService {
     return this.driverRepo.save(profile);
   }
 
-  async createVehicle(ownerUserId: string, dto: CreateVehicleDto): Promise<Vehicle> {
+  // --- Fleet / Vehicle CRUD Operations ---
+
+  async createVehicle(ownerUserId: string | null, dto: CreateVehicleDto): Promise<Vehicle> {
     const existing = await this.vehicleRepo.findOne({
       where: { registrationNumber: dto.registrationNumber.toUpperCase() },
     });
@@ -89,10 +93,100 @@ export class DriversService {
 
     const vehicle = this.vehicleRepo.create({
       ...dto,
-      ownerUserId,
+      ownerUserId: ownerUserId || undefined,
       registrationNumber: dto.registrationNumber.toUpperCase(),
     });
     return this.vehicleRepo.save(vehicle);
+  }
+
+  async findAllVehicles(query: QueryVehiclesDto): Promise<PaginatedResult<Vehicle>> {
+    const qb = this.vehicleRepo
+      .createQueryBuilder('vehicle')
+      .leftJoinAndSelect('vehicle.owner', 'owner')
+      .leftJoinAndSelect('vehicle.driverVehicles', 'dv')
+      .leftJoinAndSelect('dv.driverProfile', 'driver')
+      .leftJoinAndSelect('driver.user', 'driverUser');
+
+    if (query.status) {
+      qb.andWhere('vehicle.status = :status', { status: query.status });
+    }
+
+    if (query.category && query.category.trim().toLowerCase() !== 'all') {
+      qb.andWhere('LOWER(vehicle.vehicleCategory) = LOWER(:cat)', {
+        cat: query.category.trim(),
+      });
+    }
+
+    if (query.fuelType && query.fuelType.trim().toLowerCase() !== 'all') {
+      qb.andWhere('LOWER(vehicle.fuelType) LIKE LOWER(:fuel)', {
+        fuel: `%${query.fuelType.trim()}%`,
+      });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(vehicle.registrationNumber) LIKE LOWER(:search) OR LOWER(vehicle.make) LIKE LOWER(:search) OR LOWER(vehicle.model) LIKE LOWER(:search) OR LOWER(vehicle.vehicleCategory) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('vehicle.createdAt', query.sortOrder || 'DESC');
+    qb.skip(query.skip).take(query.limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page: query.page || 1,
+        limit: query.limit || 10,
+        totalPages: Math.ceil(total / (query.limit || 10)),
+      },
+    };
+  }
+
+  async findVehicleById(id: string): Promise<Vehicle> {
+    const vehicle = await this.vehicleRepo.findOne({
+      where: { id },
+      relations: {
+        owner: true,
+        driverVehicles: {
+          driverProfile: {
+            user: true,
+          },
+        },
+      },
+    });
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle with ID ${id} not found`);
+    }
+    return vehicle;
+  }
+
+  async updateVehicle(id: string, dto: UpdateVehicleDto): Promise<Vehicle> {
+    const vehicle = await this.findVehicleById(id);
+
+    if (dto.registrationNumber && dto.registrationNumber.toUpperCase() !== vehicle.registrationNumber) {
+      const existing = await this.vehicleRepo.findOne({
+        where: { registrationNumber: dto.registrationNumber.toUpperCase() },
+      });
+      if (existing && existing.id !== id) {
+        throw new ConflictException(
+          `Vehicle with registration number ${dto.registrationNumber} already exists`,
+        );
+      }
+      dto.registrationNumber = dto.registrationNumber.toUpperCase();
+    }
+
+    Object.assign(vehicle, dto);
+    return this.vehicleRepo.save(vehicle);
+  }
+
+  async deleteVehicle(id: string): Promise<{ success: boolean; message: string }> {
+    const vehicle = await this.findVehicleById(id);
+    await this.vehicleRepo.remove(vehicle);
+    return { success: true, message: `Vehicle ${vehicle.registrationNumber} deleted successfully` };
   }
 
   async assignVehicle(

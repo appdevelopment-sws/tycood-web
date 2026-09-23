@@ -13,6 +13,11 @@ import { User } from '../../users/entities/user.entity';
 import { VehicleStatus } from '../../../common/enums/vehicle-status.enum';
 import { DriverVehicle } from './driver-vehicle.entity';
 
+const numericTransformer = {
+  to: (value: number) => value,
+  from: (value: string) => (value ? parseFloat(value) : 0),
+};
+
 @Entity('vehicles')
 export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
@@ -47,6 +52,9 @@ export class Vehicle {
   @Column({ name: 'seating_capacity', type: 'int', default: 4 })
   seatingCapacity: number;
 
+  @Column({ name: 'luggage_capacity', type: 'int', default: 2 })
+  luggageCapacity: number;
+
   @Column({ name: 'rc_number', length: 100, nullable: true })
   rcNumber: string;
 
@@ -61,6 +69,125 @@ export class Vehicle {
 
   @Column({ name: 'insurance_doc_uploaded', type: 'boolean', default: false })
   insuranceDocUploaded: boolean;
+
+  // --- Dynamic Pricing Engine ---
+  @Column({
+    name: 'base_fare',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 499.0,
+    transformer: numericTransformer,
+  })
+  baseFare: number;
+
+  @Column({
+    name: 'base_km',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 10.0,
+    transformer: numericTransformer,
+  })
+  baseKm: number;
+
+  @Column({
+    name: 'per_km_charge',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 12.0,
+    transformer: numericTransformer,
+  })
+  perKmCharge: number;
+
+  @Column({
+    name: 'extra_km_charge',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 15.0,
+    transformer: numericTransformer,
+  })
+  extraKmCharge: number;
+
+  @Column({
+    name: 'roundoff_cost_per_km',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 11.0,
+    transformer: numericTransformer,
+  })
+  roundoffCostPerKm: number;
+
+  @Column({
+    name: 'outstation_base_charge',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 2499.0,
+    transformer: numericTransformer,
+  })
+  outstationBaseCharge: number;
+
+  @Column({
+    name: 'outstation_per_km_charge',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 14.0,
+    transformer: numericTransformer,
+  })
+  outstationPerKmCharge: number;
+
+  @Column({
+    name: 'original_fare',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 649.0,
+    transformer: numericTransformer,
+  })
+  originalFare: number;
+
+  // --- App Card Presentation & Features ---
+  @Column({ name: 'badge_tag', length: 50, nullable: true })
+  badgeTag: string | null;
+
+  @Column({
+    name: 'rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 4.8,
+    transformer: numericTransformer,
+  })
+  rating: number;
+
+  @Column({ name: 'reviews_count', type: 'int', default: 100 })
+  reviewsCount: number;
+
+  @Column({ name: 'eta_minutes', type: 'int', default: 5 })
+  etaMinutes: number;
+
+  @Column({ name: 'image_url', length: 500, nullable: true })
+  imageUrl: string | null;
+
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'::jsonb" })
+  features: string[];
+
+  @Column({ name: 'has_ac', type: 'boolean', default: true })
+  hasAc: boolean;
+
+  @Column({ name: 'toll_included', type: 'boolean', default: true })
+  tollIncluded: boolean;
+
+  @Column({ name: 'free_cancellation', type: 'boolean', default: true })
+  freeCancellation: boolean;
+
+  @Column({ name: 'is_instant', type: 'boolean', default: true })
+  isInstant: boolean;
 
   @Index()
   @Column({

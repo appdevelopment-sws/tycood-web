@@ -279,6 +279,35 @@ export class InitialSeedService implements OnApplicationBootstrap {
     // 3. Seed fleet vehicles
     const fleet = [
       {
+        registrationNumber: 'BR 01 HB 3319',
+        vehicleCategory: 'Hatchback',
+        make: 'Maruti Suzuki',
+        model: 'WagonR ZXI',
+        color: 'Silky Silver',
+        fuelType: 'CNG + Petrol',
+        seatingCapacity: 4,
+        luggageCapacity: 1,
+        baseFare: 699.0,
+        baseKm: 10.0,
+        perKmCharge: 12.0,
+        extraKmCharge: 15.0,
+        roundoffCostPerKm: 11.0,
+        outstationBaseCharge: 2299.0,
+        outstationPerKmCharge: 13.5,
+        originalFare: 839.0,
+        badgeTag: 'FASTEST',
+        rating: 4.8,
+        reviewsCount: 412,
+        etaMinutes: 6,
+        imageUrl: 'assets/car.png',
+        features: ['Compact & Fast', 'AC Included', 'Best City Commute', 'Instant Dispatch'],
+        hasAc: true,
+        tollIncluded: true,
+        freeCancellation: true,
+        isInstant: true,
+        status: VehicleStatus.ACTIVE,
+      },
+      {
         registrationNumber: 'BR 01 EA 4521',
         vehicleCategory: 'Sedan',
         make: 'Maruti Suzuki',
@@ -286,6 +315,25 @@ export class InitialSeedService implements OnApplicationBootstrap {
         color: 'Pearl Arctic White',
         fuelType: 'CNG + Petrol',
         seatingCapacity: 4,
+        luggageCapacity: 2,
+        baseFare: 649.0,
+        baseKm: 10.0,
+        perKmCharge: 14.5,
+        extraKmCharge: 17.0,
+        roundoffCostPerKm: 13.0,
+        outstationBaseCharge: 2499.0,
+        outstationPerKmCharge: 15.0,
+        originalFare: 799.0,
+        badgeTag: 'BEST VALUE',
+        rating: 4.88,
+        reviewsCount: 1420,
+        etaMinutes: 3,
+        imageUrl: 'assets/car.png',
+        features: ['AC Included', 'Clean Cab', 'Top Rated Driver', 'Toll Included'],
+        hasAc: true,
+        tollIncluded: true,
+        freeCancellation: true,
+        isInstant: true,
         status: VehicleStatus.ACTIVE,
       },
       {
@@ -296,16 +344,25 @@ export class InitialSeedService implements OnApplicationBootstrap {
         color: 'Super White',
         fuelType: 'Diesel',
         seatingCapacity: 7,
-        status: VehicleStatus.ACTIVE,
-      },
-      {
-        registrationNumber: 'BR 01 HB 3319',
-        vehicleCategory: 'Hatchback',
-        make: 'Maruti Suzuki',
-        model: 'WagonR ZXI',
-        color: 'Silky Silver',
-        fuelType: 'CNG + Petrol',
-        seatingCapacity: 4,
+        luggageCapacity: 4,
+        baseFare: 1199.0,
+        baseKm: 10.0,
+        perKmCharge: 21.0,
+        extraKmCharge: 24.0,
+        roundoffCostPerKm: 19.0,
+        outstationBaseCharge: 3999.0,
+        outstationPerKmCharge: 22.0,
+        originalFare: 1450.0,
+        badgeTag: 'POPULAR',
+        rating: 4.95,
+        reviewsCount: 2310,
+        etaMinutes: 5,
+        imageUrl: 'assets/car-front.png',
+        features: ['Dual AC', 'Extra Luggage Space', 'Captain Seats', 'Free Cancellation'],
+        hasAc: true,
+        tollIncluded: true,
+        freeCancellation: true,
+        isInstant: true,
         status: VehicleStatus.ACTIVE,
       },
       {
@@ -316,16 +373,54 @@ export class InitialSeedService implements OnApplicationBootstrap {
         color: 'Teal Blue',
         fuelType: 'Electric (EV)',
         seatingCapacity: 4,
+        luggageCapacity: 2,
+        baseFare: 599.0,
+        baseKm: 10.0,
+        perKmCharge: 12.0,
+        extraKmCharge: 14.0,
+        roundoffCostPerKm: 11.0,
+        outstationBaseCharge: 2199.0,
+        outstationPerKmCharge: 13.0,
+        originalFare: 720.0,
+        badgeTag: 'ECO-FRIENDLY',
+        rating: 4.82,
+        reviewsCount: 890,
+        etaMinutes: 4,
+        imageUrl: 'assets/car-travelling.png',
+        features: ['Silent Drive', 'AC Included', 'Eco-friendly', 'Fast Pickup'],
+        hasAc: true,
+        tollIncluded: true,
+        freeCancellation: true,
+        isInstant: true,
         status: VehicleStatus.ACTIVE,
       },
       {
         registrationNumber: 'BR 01 LX 9999',
         vehicleCategory: 'Luxury',
         make: 'Toyota',
-        model: 'Fortuner 4x4 Legender',
+        model: 'Camry Hybrid Executive',
         color: 'Attitude Black',
-        fuelType: 'Diesel',
-        seatingCapacity: 7,
+        fuelType: 'Hybrid',
+        seatingCapacity: 4,
+        luggageCapacity: 3,
+        baseFare: 1899.0,
+        baseKm: 10.0,
+        perKmCharge: 28.0,
+        extraKmCharge: 32.0,
+        roundoffCostPerKm: 25.0,
+        outstationBaseCharge: 5499.0,
+        outstationPerKmCharge: 30.0,
+        originalFare: 2250.0,
+        badgeTag: 'LUXURY',
+        rating: 4.98,
+        reviewsCount: 530,
+        etaMinutes: 8,
+        imageUrl: 'assets/car-front1.png',
+        features: ['Chauffeur in Uniform', 'Leather Seats', 'Bottled Water & Wi-Fi', 'Free Cancellation'],
+        hasAc: true,
+        tollIncluded: true,
+        freeCancellation: true,
+        isInstant: false,
         status: VehicleStatus.ACTIVE,
       },
     ];
@@ -340,23 +435,27 @@ export class InitialSeedService implements OnApplicationBootstrap {
           ownerUserId: driverUser.id,
         });
         vehicle = await this.vehicleRepo.save(vehicle);
-
-        // Assign to driver
-        const existingAssignment = await this.driverVehicleRepo.findOne({
-          where: { driverProfileId: driverProfile.id, vehicleId: vehicle.id },
-        });
-        if (!existingAssignment) {
-          await this.driverVehicleRepo.save(
-            this.driverVehicleRepo.create({
-              driverProfileId: driverProfile.id,
-              vehicleId: vehicle.id,
-              isPrimary: v.vehicleCategory === 'Sedan',
-              assignmentStatus: DriverVehicleAssignmentStatus.ASSIGNED,
-            }),
-          );
-        }
-        this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
+      } else {
+        // Sync any updated pricing / card fields on restart
+        Object.assign(vehicle, v);
+        vehicle = await this.vehicleRepo.save(vehicle);
       }
+
+      // Assign to driver
+      const existingAssignment = await this.driverVehicleRepo.findOne({
+        where: { driverProfileId: driverProfile.id, vehicleId: vehicle.id },
+      });
+      if (!existingAssignment) {
+        await this.driverVehicleRepo.save(
+          this.driverVehicleRepo.create({
+            driverProfileId: driverProfile.id,
+            vehicleId: vehicle.id,
+            isPrimary: v.vehicleCategory === 'Sedan',
+            assignmentStatus: DriverVehicleAssignmentStatus.ASSIGNED,
+          }),
+        );
+      }
+      this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
     }
 
     // 3b. Seed Delhi fleet & driver for multi-location testing

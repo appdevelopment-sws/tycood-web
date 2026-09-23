@@ -1,26 +1,26 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { AdminLayout } from './components/layout/AdminLayout';
-import { ROUTES } from './constants/routes';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { AuthProvider } from "./context/AuthContext"
+import { ProtectedRoute } from "./components/common/ProtectedRoute"
+import { AdminLayout } from "./components/layout/AdminLayout"
+import { ROUTES } from "./constants/routes"
 
 // Import Feature Pages
-import { LoginPage } from './pages/auth/LoginPage';
-import { DashboardPage } from './pages/dashboard/DashboardPage';
-import { OperatorsPage } from './pages/operators/OperatorsPage';
-import { BusesPage } from './pages/buses/BusesPage';
-import { RoutesPage } from './pages/routes/RoutesPage';
-import { StationsPage } from './pages/stations/StationsPage';
-import { SchedulesPage } from './pages/schedules/SchedulesPage';
-import { TripsPage } from './pages/trips/TripsPage';
-import { BookingsPage } from './pages/bookings/BookingsPage';
-import { UsersPage } from './pages/users/UsersPage';
-import { VouchersPage } from './pages/vouchers/VouchersPage';
-import { DriversPage } from './pages/drivers/DriversPage';
-import { SeatsPage } from './pages/seats/SeatsPage';
-import { ReportsPage } from './pages/reports/ReportsPage';
-import { RolesPermissionsPage } from './pages/roles/RolesPermissionsPage';
-import { SettingsPage } from './pages/settings/SettingsPage';
+import { LoginPage } from "./pages/auth/LoginPage"
+import { DashboardPage } from "./pages/dashboard/DashboardPage"
+import { OperatorsPage } from "./pages/operators/OperatorsPage"
+import CabTypePage from "./pages/cabType/CabTypePage"
+import { RoutesPage } from "./pages/routes/RoutesPage"
+import { StationsPage } from "./pages/stations/StationsPage"
+import { SchedulesPage } from "./pages/schedules/SchedulesPage"
+import { TripsPage } from "./pages/trips/TripsPage"
+import { BookingsPage } from "./pages/bookings/BookingsPage"
+import { UsersPage } from "./pages/users/UsersPage"
+import { VouchersPage } from "./pages/vouchers/VouchersPage"
+import { DriversPage } from "./pages/drivers/DriversPage"
+import { SeatsPage } from "./pages/seats/SeatsPage"
+import { ReportsPage } from "./pages/reports/ReportsPage"
+import { RolesPermissionsPage } from "./pages/roles/RolesPermissionsPage"
+import { SettingsPage } from "./pages/settings/SettingsPage"
 
 export function App() {
   return (
@@ -41,7 +41,7 @@ export function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path={ROUTES.OPERATORS} element={<OperatorsPage />} />
-            <Route path={ROUTES.BUSES} element={<BusesPage />} />
+            <Route path={ROUTES.CABS_TYPE} element={<CabTypePage />} />
             <Route path={ROUTES.ROUTES} element={<RoutesPage />} />
             <Route path={ROUTES.STATIONS} element={<StationsPage />} />
             <Route path={ROUTES.SCHEDULES} element={<SchedulesPage />} />
@@ -61,7 +61,7 @@ export function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
+export default App
