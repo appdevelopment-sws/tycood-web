@@ -221,6 +221,7 @@ export class BookingsService {
         similarModels: vehicle.similarModels || similarHint,
         modelSubtitle: modelSubtitle,
         imageAsset: vehicle.imageUrl || 'assets/car.png',
+        imageUrl: vehicle.imageUrl || 'assets/car.png',
         registrationNumber: vehicle.registrationNumber,
         driverName: driverName,
         rating: Number(driverRating),

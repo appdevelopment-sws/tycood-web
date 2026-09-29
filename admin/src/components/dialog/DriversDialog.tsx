@@ -166,7 +166,7 @@ export default function DriverDrawer({
             <FormSelectField
               control={control}
               name="operatorId"
-              label="BUS OPERATOR"
+              label=""
               placeholder="Select bus operator..."
               options={operatorOptions}
               required

@@ -22,6 +22,7 @@ import {
   CAB_FUEL_OPTIONS,
   BADGE_TAG_OPTIONS,
 } from "@/constants/page/super-admin/cabs"
+import { resolveCabImageUrl } from "@/lib/utils"
 
 export interface CabDrawerProps {
   open: boolean
@@ -287,15 +288,14 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
           <div className="mt-3 flex items-center gap-4">
             <div className="flex h-16 w-20 items-center justify-center rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
               <img
-                src={
-                  watchedValues.imageUrl?.startsWith("http")
-                    ? watchedValues.imageUrl
-                    : "/assets/car.png"
-                }
+                src={resolveCabImageUrl(watchedValues.imageUrl)}
                 alt="Car"
                 className="max-h-full max-w-full object-contain"
                 onError={(e) => {
-                  ;(e.target as HTMLElement).style.display = "none"
+                  const target = e.currentTarget
+                  if (!target.src.endsWith("/assets/car.png")) {
+                    target.src = "/assets/car.png"
+                  }
                 }}
               />
             </div>
@@ -634,6 +634,7 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
               {!isViewMode && (
                 <div className="mb-2">
                   <FileUpload
+                    value={watchedValues.imageUrl ? [watchedValues.imageUrl] : []}
                     label="Upload Vehicle Image"
                     helperText="Upload JPG, PNG or WebP car image"
                     accept="image/*"
@@ -646,8 +647,10 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
                           ? res[0]?.url || res[0]
                           : res.url || res
                         if (url) {
-                          setValue("imageUrl", url)
+                          setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
                         }
+                      } else {
+                        setValue("imageUrl", "", { shouldDirty: true })
                       }
                     }}
                   />

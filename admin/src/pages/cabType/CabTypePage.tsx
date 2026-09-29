@@ -18,6 +18,7 @@ import { queryKeys } from "@/lib/queryKeys"
 import { INITIAL_CAB_FILTERS } from "@/constants/page/super-admin/cabs"
 import CabDrawer from "@/components/dialog/CabDialog"
 import type { CabVehicle } from "@/types/cab"
+import { resolveCabImageUrl } from "@/lib/utils"
 
 export const CabTypePage = () => {
   const queryClient = useQueryClient()
@@ -70,15 +71,14 @@ export const CabTypePage = () => {
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-14 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900">
               <img
-                src={
-                  row.imageUrl?.startsWith("http")
-                    ? row.imageUrl
-                    : "/assets/car.png"
-                }
+                src={resolveCabImageUrl(row.imageUrl)}
                 alt={row.name || row.vehicleCategory}
                 className="max-h-full max-w-full object-contain"
                 onError={(e) => {
-                  ;(e.target as HTMLElement).style.display = "none"
+                  const target = e.currentTarget
+                  if (!target.src.endsWith("/assets/car.png")) {
+                    target.src = "/assets/car.png"
+                  }
                 }}
               />
             </div>

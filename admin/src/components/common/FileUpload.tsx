@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
 import {
   UploadCloud,
@@ -41,31 +41,47 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [isUploading, setIsUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadResponse[]>(() => {
-    if (!value) return []
-    if (Array.isArray(value)) {
-      return value.map((item) =>
+
+  const parseInitialFiles = (val: typeof value): UploadResponse[] => {
+    if (!val) return []
+    if (Array.isArray(val)) {
+      return val.map((item) =>
         typeof item === "string"
           ? {
               url: item,
               filename: item.split("/").pop() || "file",
               originalName: item.split("/").pop() || "file",
-              mimetype: "application/octet-stream",
+              mimetype: item.match(/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i)
+                ? `image/${item.split(".").pop()?.toLowerCase()}`
+                : "application/octet-stream",
               size: 0,
             }
           : item
       )
     }
-    return [
-      {
-        url: value,
-        filename: value.split("/").pop() || "file",
-        originalName: value.split("/").pop() || "file",
-        mimetype: "application/octet-stream",
-        size: 0,
-      },
-    ]
-  })
+    if (typeof val === "string") {
+      return [
+        {
+          url: val,
+          filename: val.split("/").pop() || "file",
+          originalName: val.split("/").pop() || "file",
+          mimetype: val.match(/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i)
+            ? `image/${val.split(".").pop()?.toLowerCase()}`
+            : "application/octet-stream",
+          size: 0,
+        },
+      ]
+    }
+    return []
+  }
+
+  const [uploadedFiles, setUploadedFiles] = useState<UploadResponse[]>(() =>
+    parseInitialFiles(value)
+  )
+
+  useEffect(() => {
+    setUploadedFiles(parseInitialFiles(value))
+  }, [value])
 
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -76,6 +92,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     const sizes = ["Bytes", "KB", "MB", "GB"]
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+  }
+
+  const isImageFile = (file: UploadResponse) => {
+    return (
+      file.mimetype?.startsWith("image/") ||
+      /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(file.url)
+    )
   }
 
   const getFileIcon = (mimetype: string) => {
@@ -263,8 +286,19 @@ export const FileUpload: React.FC<FileUploadProps> = ({
               className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800 flex-shrink-0">
-                  {getFileIcon(file.mimetype)}
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-100 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-800 flex-shrink-0">
+                  {isImageFile(file) ? (
+                    <img
+                      src={file.url}
+                      alt={file.filename}
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.display = "none"
+                      }}
+                    />
+                  ) : (
+                    getFileIcon(file.mimetype)
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
