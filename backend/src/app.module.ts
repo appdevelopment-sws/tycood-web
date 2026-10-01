@@ -9,6 +9,8 @@ import { DriversModule } from './modules/drivers/drivers.module';
 import { ParkingModule } from './modules/parking/parking.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { TaxesModule } from './modules/taxes/taxes.module.js';
+import { SettingsModule } from './modules/settings/settings.module.js';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -27,6 +29,8 @@ import { AppService } from './app.service';
     ParkingModule,
     BookingsModule,
     UploadModule,
+    TaxesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

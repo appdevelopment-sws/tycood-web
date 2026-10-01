@@ -200,9 +200,20 @@ export class BookingsService {
         (isOutstation ? outstationBaseCharge * 1.2 : originalFare) * distanceMultiplier,
       );
 
-      const features = Array.isArray(vehicle.features) && vehicle.features.length > 0
+      const vehicleHasAc =
+        vehicle.hasAc === false || (vehicle.hasAc as any) === 0 || (vehicle.hasAc as any) === 'false'
+          ? false
+          : vehicle.hasAc === true || (vehicle.hasAc as any) === 1 || (vehicle.hasAc as any) === 'true'
+          ? true
+          : true;
+
+      const rawFeatures = Array.isArray(vehicle.features) && vehicle.features.length > 0
         ? vehicle.features
         : config.features;
+
+      const sanitizedFeatures = vehicleHasAc
+        ? rawFeatures
+        : rawFeatures.filter((f: string) => !f.toLowerCase().includes('ac'));
 
       const badgeTag = vehicle.badgeTag || config.badgeTag;
       const etaMinutes = vehicle.etaMinutes || (2 + (idx % 6));
@@ -239,9 +250,9 @@ export class BookingsService {
         seats: vehicle.seatingCapacity || 4,
         luggageBags: vehicle.luggageCapacity || config.luggageBags,
         eta: `${etaMinutes} mins away`,
-        features: features,
+        features: sanitizedFeatures,
         badgeTag: badgeTag,
-        hasAc: vehicle.hasAc ?? true,
+        hasAc: vehicleHasAc,
         isInstant: vehicle.isInstant ?? true,
         freeCancellation: vehicle.freeCancellation ?? true,
         tollIncluded: vehicle.tollIncluded ?? true,

@@ -59,6 +59,15 @@ export const queryKeys = {
     list: (filters?: Record<string, any>) => ['vouchers', 'list', filters] as const,
     detail: (id?: string | number) => ['vouchers', 'detail', id] as const,
   },
+  taxes: {
+    all: ['taxes'] as const,
+    list: (filters?: Record<string, any>) => ['taxes', 'list', filters] as const,
+    detail: (id?: string) => ['taxes', 'detail', id] as const,
+  },
+  settings: {
+    all: ['settings'] as const,
+    detail: (includeSecrets?: boolean) => ['settings', includeSecrets] as const,
+  },
 } as const
 
 

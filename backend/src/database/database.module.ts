@@ -8,6 +8,8 @@ import { Vehicle } from '../modules/drivers/entities/vehicle.entity';
 import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
 import { Booking } from '../modules/bookings/entities/booking.entity';
+import { Tax } from '../modules/taxes/entities/tax.entity.js';
+import { SystemSetting } from '../modules/settings/entities/system-setting.entity.js';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -23,6 +25,8 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       DriverProfile,
       DriverVehicle,
       Booking,
+      Tax,
+      SystemSetting,
     ]),
   ],
   providers: [InitialSeedService],

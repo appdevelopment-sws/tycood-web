@@ -9,6 +9,10 @@ import { Vehicle } from '../../modules/drivers/entities/vehicle.entity.js';
 import { DriverProfile } from '../../modules/drivers/entities/driver-profile.entity.js';
 import { DriverVehicle } from '../../modules/drivers/entities/driver-vehicle.entity.js';
 import { Booking } from '../../modules/bookings/entities/booking.entity.js';
+import { Tax } from '../../modules/taxes/entities/tax.entity.js';
+import { TaxType } from '../../modules/taxes/enums/tax-type.enum.js';
+import { TaxScope } from '../../modules/taxes/enums/tax-scope.enum.js';
+import { SystemSetting } from '../../modules/settings/entities/system-setting.entity.js';
 import { BusinessRole } from '../../common/enums/business-role.enum.js';
 import { RoleAssignmentStatus } from '../../common/enums/role-status.enum.js';
 import { VerificationStatus } from '../../common/enums/verification-status.enum.js';
@@ -40,12 +44,17 @@ export class InitialSeedService implements OnApplicationBootstrap {
     private readonly driverVehicleRepo: Repository<DriverVehicle>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Tax)
+    private readonly taxRepo: Repository<Tax>,
+    @InjectRepository(SystemSetting)
+    private readonly settingRepo: Repository<SystemSetting>,
   ) {}
 
   async onApplicationBootstrap() {
     await this.seedRoles();
     await this.seedAdmin();
     await this.seedFleetAndBookings();
+    await this.seedTaxesAndSettings();
   }
 
   private async seedRoles() {
@@ -697,4 +706,184 @@ export class InitialSeedService implements OnApplicationBootstrap {
       this.logger.log(`Seeded initial bookings for customer: ${customerEmail}`);
     }
   }
+
+  private async seedTaxesAndSettings() {
+    // Seed initial taxes if empty
+    const taxCount = await this.taxRepo.count();
+    if (taxCount === 0) {
+      const defaultTaxes = [
+        {
+          name: 'Goods & Services Tax (GST 5%)',
+          code: 'GST_5',
+          taxType: TaxType.PERCENTAGE,
+          rate: 5.0,
+          description: 'Standard transport GST applicable to intra-city and outstation cab bookings',
+          applicableOn: TaxScope.ALL_RIDES,
+          isIncludedInFare: false,
+          isActive: true,
+          priority: 1,
+        },
+        {
+          name: 'Central GST (CGST 2.5%)',
+          code: 'CGST_2_5',
+          taxType: TaxType.PERCENTAGE,
+          rate: 2.5,
+          description: 'Central component of statutory Goods & Services Tax',
+          applicableOn: TaxScope.ALL_RIDES,
+          isIncludedInFare: false,
+          isActive: false,
+          priority: 2,
+        },
+        {
+          name: 'State GST (SGST 2.5%)',
+          code: 'SGST_2_5',
+          taxType: TaxType.PERCENTAGE,
+          rate: 2.5,
+          description: 'State component of statutory Goods & Services Tax',
+          applicableOn: TaxScope.ALL_RIDES,
+          isIncludedInFare: false,
+          isActive: false,
+          priority: 3,
+        },
+        {
+          name: 'Airport Convenience & Access Cess',
+          code: 'AIRPORT_CESS',
+          taxType: TaxType.FIXED,
+          rate: 60.0,
+          description: 'Fixed terminal toll charge for rides originating or ending at airport terminals',
+          applicableOn: TaxScope.AIRPORT_RIDES,
+          isIncludedInFare: false,
+          isActive: true,
+          priority: 4,
+        },
+        {
+          name: 'Night Ride Safety Surcharge (10%)',
+          code: 'NIGHT_SURCHARGE_10',
+          taxType: TaxType.PERCENTAGE,
+          rate: 10.0,
+          description: 'Operational peak & security surcharge applied to trips booked between 11:00 PM and 05:00 AM',
+          applicableOn: TaxScope.NIGHT_RIDES,
+          isIncludedInFare: false,
+          isActive: true,
+          priority: 5,
+        },
+      ];
+
+      for (const t of defaultTaxes) {
+        await this.taxRepo.save(this.taxRepo.create(t));
+      }
+      this.logger.log('Seeded default industry taxes and surcharges.');
+    }
+
+    // Seed default system settings if empty
+    const settingCount = await this.settingRepo.count();
+    if (settingCount === 0) {
+      const defaultSettings = [
+        {
+          key: 'GOOGLE_MAPS_API_KEY',
+          value: '',
+          category: 'MAPS_LOCATION',
+          description: 'Google Maps JavaScript API & Distance Matrix Key',
+          isSecret: true,
+        },
+        {
+          key: 'RAZORPAY_KEY_ID',
+          value: '',
+          category: 'PAYMENT_GATEWAY',
+          description: 'Razorpay Public Merchant Key ID',
+          isSecret: false,
+        },
+        {
+          key: 'RAZORPAY_KEY_SECRET',
+          value: '',
+          category: 'PAYMENT_GATEWAY',
+          description: 'Razorpay Merchant Secret Key',
+          isSecret: true,
+        },
+        {
+          key: 'STRIPE_PUBLISHABLE_KEY',
+          value: '',
+          category: 'PAYMENT_GATEWAY',
+          description: 'Stripe Publishable Key for card checkout',
+          isSecret: false,
+        },
+        {
+          key: 'STRIPE_SECRET_KEY',
+          value: '',
+          category: 'PAYMENT_GATEWAY',
+          description: 'Stripe Secret Key for server charges & refunds',
+          isSecret: true,
+        },
+        {
+          key: 'TWILIO_ACCOUNT_SID',
+          value: '',
+          category: 'NOTIFICATIONS',
+          description: 'Twilio Account SID for sending rider OTP SMS',
+          isSecret: false,
+        },
+        {
+          key: 'TWILIO_AUTH_TOKEN',
+          value: '',
+          category: 'NOTIFICATIONS',
+          description: 'Twilio Authentication Token',
+          isSecret: true,
+        },
+        {
+          key: 'TWILIO_SENDER_NUMBER',
+          value: '',
+          category: 'NOTIFICATIONS',
+          description: 'Twilio Registered Phone Number / Alphanumeric Sender ID',
+          isSecret: false,
+        },
+        {
+          key: 'FIREBASE_SERVER_KEY',
+          value: '',
+          category: 'NOTIFICATIONS',
+          description: 'FCM Server Key for mobile push notifications',
+          isSecret: true,
+        },
+        {
+          key: 'PLATFORM_CURRENCY',
+          value: 'INR',
+          category: 'GENERAL',
+          description: 'Default platform currency ISO 4217 code (e.g. INR, USD, EUR)',
+          isSecret: false,
+        },
+        {
+          key: 'PLATFORM_BASE_FEE',
+          value: '49',
+          category: 'GENERAL',
+          description: 'Platform facilitation service fee charged per ride',
+          isSecret: false,
+        },
+        {
+          key: 'AUTO_DISPATCH_RADIUS_KM',
+          value: '5',
+          category: 'GENERAL',
+          description: 'Maximum search radius in kilometers for auto-dispatching nearby drivers',
+          isSecret: false,
+        },
+        {
+          key: 'DRIVER_ACCEPT_TIMEOUT_SEC',
+          value: '45',
+          category: 'GENERAL',
+          description: 'Seconds a driver has to accept or decline an incoming trip dispatch',
+          isSecret: false,
+        },
+        {
+          key: 'SUPPORT_EMAIL',
+          value: 'support@cabbooking.com',
+          category: 'GENERAL',
+          description: 'Official customer support email shown in rider receipt & app',
+          isSecret: false,
+        },
+      ];
+
+      for (const s of defaultSettings) {
+        await this.settingRepo.save(this.settingRepo.create(s));
+      }
+      this.logger.log('Seeded default system settings and key placeholders.');
+    }
+  }
 }
+

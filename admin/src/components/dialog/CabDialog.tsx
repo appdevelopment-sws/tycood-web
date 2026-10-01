@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -110,10 +110,33 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
           "Instant Dispatch",
         ]
         setFeaturesList(defaultFeats)
-        reset({ ...CAB_FORM_INITIAL_DATA, features: defaultFeats })
       }
     }
   }, [open, cab, reset, isEditMode, isViewMode])
+
+  // Automatically sync features tags when AC Included checkbox is toggled
+  const watchedHasAc = watchedValues.hasAc
+  const prevHasAcRef = useRef<boolean | undefined>(undefined)
+
+  useEffect(() => {
+    if (open) {
+      if (prevHasAcRef.current !== undefined && prevHasAcRef.current !== watchedHasAc) {
+        if (!watchedHasAc) {
+          setFeaturesList((prev) => prev.filter((f) => !f.toLowerCase().includes("ac")))
+        } else {
+          setFeaturesList((prev) => {
+            if (!prev.some((f) => f.toLowerCase().includes("ac"))) {
+              return [...prev, "AC Included"]
+            }
+            return prev
+          })
+        }
+      }
+      prevHasAcRef.current = watchedHasAc
+    } else {
+      prevHasAcRef.current = undefined
+    }
+  }, [watchedHasAc, open])
 
   const queryClient = useQueryClient()
 
@@ -189,7 +212,9 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
       reviewsCount: Number(data.reviewsCount) || 100,
       etaMinutes: Number(data.etaMinutes) || 5,
       imageUrl: data.imageUrl || "assets/car.png",
-      features: featuresList,
+      features: !data.hasAc
+        ? featuresList.filter((f) => !f.toLowerCase().includes("ac"))
+        : featuresList,
 
       hasAc: !!data.hasAc,
       tollIncluded: !!data.tollIncluded,

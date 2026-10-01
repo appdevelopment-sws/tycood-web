@@ -187,6 +187,14 @@ export class DriversService {
       dto.registrationNumber = dto.registrationNumber.toUpperCase();
     }
 
+    if (dto.hasAc === false) {
+      if (Array.isArray(dto.features)) {
+        dto.features = dto.features.filter((f) => !f.toLowerCase().includes('ac'));
+      } else if (Array.isArray(vehicle.features)) {
+        vehicle.features = vehicle.features.filter((f) => !f.toLowerCase().includes('ac'));
+      }
+    }
+
     Object.assign(vehicle, dto);
     return this.vehicleRepo.save(vehicle);
   }
