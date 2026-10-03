@@ -2,8 +2,10 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SettingsService } from '../settings/settings.service.js';
 import {
   Coordinates,
   AddressComponents,
@@ -23,7 +25,8 @@ import { LocationCacheService } from './location-cache.service.js';
 @Injectable()
 export class LocationService {
   private readonly logger = new Logger(LocationService.name);
-  private readonly apiKey: string;
+  private cachedApiKey: string | null = null;
+  private apiKeyCacheExpiresAt = 0;
   private readonly placesBaseUrl = 'https://places.googleapis.com/v1';
   private readonly routesBaseUrl = 'https://routes.googleapis.com';
   private readonly legacyBaseUrl = 'https://maps.googleapis.com/maps/api';
@@ -32,26 +35,63 @@ export class LocationService {
   constructor(
     private readonly configService: ConfigService,
     private readonly cacheService: LocationCacheService,
-  ) {
-    this.apiKey =
+    @Optional()
+    private readonly settingsService?: SettingsService,
+  ) {}
+
+  /**
+   * Helper to ensure API key is available.
+   * Priority:
+   * 1. Settings database key (`GOOGLE_MAPS_API_KEY` or `gmap`)
+   * 2. Environment variables / ConfigService (`GOOGLE_MAPS_API_KEY` or `gmap`)
+   */
+  private async ensureApiKey(): Promise<string> {
+    const now = Date.now();
+    if (this.cachedApiKey !== null && now < this.apiKeyCacheExpiresAt) {
+      return this.cachedApiKey;
+    }
+
+    let key: string | null = null;
+
+    if (this.settingsService) {
+      try {
+        key = await this.settingsService.getSetting('GOOGLE_MAPS_API_KEY');
+        if (!key || !key.trim()) {
+          key = await this.settingsService.getSetting('gmap');
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to fetch Google Maps API key from settings: ${err.message}`,
+        );
+      }
+    }
+
+    if (key && typeof key === 'string' && key.trim() && !key.includes('••••')) {
+      this.cachedApiKey = key.trim();
+      this.apiKeyCacheExpiresAt = now + 60 * 1000; // cache for 1 minute
+      return this.cachedApiKey;
+    }
+
+    // Fallback to environment variables / ConfigService
+    const envKey =
       this.configService.get<string>('GOOGLE_MAPS_API_KEY') ||
       this.configService.get<string>('gmap') ||
       process.env.GOOGLE_MAPS_API_KEY ||
       process.env.gmap ||
       '';
 
-    if (!this.apiKey) {
-      this.logger.warn(
-        'Google Maps API Key is not configured! Please set GOOGLE_MAPS_API_KEY or gmap in your .env file.',
-      );
+    if (envKey && envKey.trim()) {
+      this.cachedApiKey = envKey.trim();
+      this.apiKeyCacheExpiresAt = now + 60 * 1000;
+      return this.cachedApiKey;
     }
-  }
 
-  /**
-   * Helper to ensure API key is available
-   */
-  private ensureApiKey(): string {
-    return this.apiKey || '';
+    this.logger.warn(
+      'Google Maps API Key is not configured! Please configure GOOGLE_MAPS_API_KEY in Settings or set GOOGLE_MAPS_API_KEY / gmap in your .env file.',
+    );
+    this.cachedApiKey = '';
+    this.apiKeyCacheExpiresAt = now + 15 * 1000; // Retry after 15s
+    return '';
   }
 
   /**
@@ -235,7 +275,7 @@ export class LocationService {
     const cached = this.cacheService.get<ReverseGeocodeResult>(cacheKey);
     if (cached) return cached;
 
-    const key = this.ensureApiKey();
+    const key = await this.ensureApiKey();
     if (key) {
       const url = `${this.legacyBaseUrl}/geocode/json?latlng=${lat},${lng}&key=${key}`;
       const res = await this.safeFetch<any>(url);
@@ -290,7 +330,7 @@ export class LocationService {
       if (cached) return cached;
     }
 
-    const key = this.ensureApiKey();
+    const key = await this.ensureApiKey();
     const cleanInput = dto.input.trim();
 
     // 1. Try Places API (New)
@@ -504,7 +544,7 @@ export class LocationService {
     if (cached) return cached;
 
     const cleanPlaceId = placeId.replace(/^places\//, '');
-    const key = this.ensureApiKey();
+    const key = await this.ensureApiKey();
 
     // 1. Try Places API (New)
     if (key) {
@@ -645,7 +685,7 @@ export class LocationService {
     const cached = this.cacheService.get<DistanceMatrixItem>(cacheKey);
     if (cached) return cached;
 
-    const key = this.ensureApiKey();
+    const key = await this.ensureApiKey();
 
     // 1. Try Routes API (New) computeRoutes
     if (key) {
@@ -840,7 +880,7 @@ export class LocationService {
     const cached = this.cacheService.get<DirectionsResult>(cacheKey);
     if (cached) return cached;
 
-    const key = this.ensureApiKey();
+    const key = await this.ensureApiKey();
 
     // 1. Try Routes API (New)
     if (key) {
