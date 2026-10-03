@@ -35,4 +35,43 @@ export class AvailableCabsQueryDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional({
+    example: 45.5,
+    description: 'Estimated or calculated trip distance in kilometers',
+  })
+  @IsOptional()
+  distanceKm?: number;
+
+  @ApiPropertyOptional({
+    example: 'Varanasi Junction',
+    description: 'Intermediate stop if any',
+  })
+  @IsOptional()
+  @IsString()
+  intermediateStop?: string;
+
+  @ApiPropertyOptional({ example: 25.5941, description: 'Pickup latitude' })
+  @IsOptional()
+  pickupLat?: number;
+
+  @ApiPropertyOptional({ example: 85.1376, description: 'Pickup longitude' })
+  @IsOptional()
+  pickupLng?: number;
+
+  @ApiPropertyOptional({ example: 22.5726, description: 'Drop latitude' })
+  @IsOptional()
+  dropLat?: number;
+
+  @ApiPropertyOptional({ example: 88.3639, description: 'Drop longitude' })
+  @IsOptional()
+  dropLng?: number;
+
+  @ApiPropertyOptional({
+    example: '2026-10-06',
+    description: 'Return date string for round-trip travel',
+  })
+  @IsOptional()
+  @IsString()
+  returnDate?: string;
 }

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -11,6 +12,10 @@ import { Booking } from './entities/booking.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Vehicle } from '../drivers/entities/vehicle.entity.js';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity.js';
+import { Tax } from '../taxes/entities/tax.entity.js';
+import { TaxType } from '../taxes/enums/tax-type.enum.js';
+import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
+import { LocationService } from '../location/location.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
 import { QueryBookingsDto } from './dto/query-bookings.dto.js';
 import { AvailableCabsQueryDto } from './dto/available-cabs-query.dto.js';
@@ -37,7 +42,11 @@ export class BookingsService {
     private readonly vehicleRepo: Repository<Vehicle>,
     @InjectRepository(DriverProfile)
     private readonly driverRepo: Repository<DriverProfile>,
+    @InjectRepository(Tax)
+    private readonly taxRepo: Repository<Tax>,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly locationService?: LocationService,
   ) {}
 
   /**
@@ -60,9 +69,70 @@ export class BookingsService {
 
     const vehicles = await queryBuilder.getMany();
 
-    const isRoundTrip = query.tripType === BookingTripType.ROUND_TRIP;
-    const isOutstation = query.tripType === BookingTripType.OUTSTATION;
-    const distanceMultiplier = isRoundTrip ? 2.0 : isOutstation ? 1.4 : 1.0;
+    // 2. Resolve distance in kilometers from query or via LocationService
+    let resolvedDistanceKm = 0;
+    if (query.distanceKm && Number(query.distanceKm) > 0) {
+      resolvedDistanceKm = Number(query.distanceKm);
+    } else if (
+      this.locationService &&
+      query.pickupLocation &&
+      query.dropLocation &&
+      query.pickupLocation.trim().length > 0 &&
+      query.dropLocation.trim().length > 0
+    ) {
+      try {
+        const distResult = await this.locationService.calculateDistance({
+          origin: query.pickupLocation,
+          destination: query.dropLocation,
+          originLat:
+            query.pickupLat !== undefined ? Number(query.pickupLat) : undefined,
+          originLng:
+            query.pickupLng !== undefined ? Number(query.pickupLng) : undefined,
+          destLat:
+            query.dropLat !== undefined ? Number(query.dropLat) : undefined,
+          destLng:
+            query.dropLng !== undefined ? Number(query.dropLng) : undefined,
+        });
+        const distKm =
+          distResult?.distance?.kilometers ||
+          (distResult?.distance?.value ? distResult.distance.value / 1000 : 0);
+        if (distKm > 0) {
+          resolvedDistanceKm = Math.round(distKm * 10) / 10;
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to resolve distance via locationService: ${err}`,
+        );
+      }
+    }
+
+    // Sensible fallback distance if coordinates/places could not resolve distance
+    if (!resolvedDistanceKm || resolvedDistanceKm <= 0) {
+      resolvedDistanceKm =
+        query.tripType === BookingTripType.OUTSTATION ? 120 : 25;
+    }
+
+    const isRoundTrip =
+      query.tripType === BookingTripType.ROUND_TRIP ||
+      Boolean(query.returnDate && query.returnDate.trim().length > 0);
+    const isOutstation =
+      query.tripType === BookingTripType.OUTSTATION || resolvedDistanceKm > 75;
+
+    // For round trips, vehicle travels both ways (outbound + return)
+    const totalBillableKm = isRoundTrip
+      ? Math.round(resolvedDistanceKm * 2 * 10) / 10
+      : Math.round(resolvedDistanceKm * 10) / 10;
+
+    // 3. Fetch active taxes and surcharges from database
+    let activeTaxes: Tax[] = [];
+    try {
+      activeTaxes = await this.taxRepo.find({
+        where: { isActive: true },
+        order: { priority: 'ASC' },
+      });
+    } catch (e) {
+      this.logger.warn(`Could not load taxes from DB: ${e}`);
+    }
 
     // Helper category configurations for default specs/rates when not customized per-vehicle
     const categoryDefaults: Record<
@@ -153,20 +223,81 @@ export class BookingsService {
       const driverName = assignedDriver?.user?.name || 'Verified Partner Driver';
       const driverRating = vehicle.rating || 4.8;
 
-      // Use vehicle configured pricing or fallback to category defaults
+      // Base rates and charges configured on vehicle or category fallback
       const baseFare = Number(vehicle.baseFare) || config.baseRate;
       const originalFare = Number(vehicle.originalFare) || config.originalRate;
       const perKmRate = Number(vehicle.perKmCharge) || config.perKmRate;
       const extraKmCharge = Number(vehicle.extraKmCharge) || (perKmRate + 3);
-      const roundoffCostPerKm = Number(vehicle.roundoffCostPerKm) || (perKmRate - 1);
-      const outstationBaseCharge = Number(vehicle.outstationBaseCharge) || (baseFare * 3);
-      const outstationPerKmCharge = Number(vehicle.outstationPerKmCharge) || (perKmRate + 2);
+      const roundoffCostPerKm =
+        Number(vehicle.roundoffCostPerKm) || Math.max(10, perKmRate - 1.5);
+      const outstationBaseCharge =
+        Number(vehicle.outstationBaseCharge) || Math.round(baseFare * 2.0);
+      const outstationPerKmCharge =
+        Number(vehicle.outstationPerKmCharge) || Math.round((perKmRate + 2) * 10) / 10;
 
-      const calculatedFare = Math.round(
-        (isOutstation ? outstationBaseCharge : baseFare) * distanceMultiplier,
-      );
+      // Effective Per-Km Rate
+      const effectivePerKmRate = isRoundTrip
+        ? roundoffCostPerKm // Discounted round-trip per-km rate
+        : isOutstation
+          ? outstationPerKmCharge
+          : perKmRate;
+
+      // Distance Charge: Direct (totalBillableKm * perKmRate) without deducting base km
+      const distanceCharge = Math.round(totalBillableKm * effectivePerKmRate);
+
+      // Outstation extra charge if outstation trip
+      const outstationExtraCharge = isOutstation ? outstationBaseCharge : 0;
+
+      // Subtotal = Base Fare + (Distance * Rate) + Outstation Charge
+      const subtotal = Math.round(baseFare + distanceCharge + outstationExtraCharge);
+
+      // Dynamic Taxes (e.g. GST 5% from system settings/tax table)
+      const appliedTaxes: Array<{
+        name: string;
+        code: string;
+        rate: number;
+        amount: number;
+      }> = [];
+      let totalTaxAmount = 0;
+
+      if (activeTaxes.length > 0) {
+        for (const tax of activeTaxes) {
+          if (
+            tax.applicableOn === TaxScope.ALL_RIDES ||
+            (tax.applicableOn === TaxScope.OUTSTATION && isOutstation) ||
+            (tax.applicableOn === TaxScope.INTERCITY_ONLY && isOutstation)
+          ) {
+            let taxAmt = 0;
+            if (tax.taxType === TaxType.PERCENTAGE) {
+              taxAmt = Math.round((subtotal * Number(tax.rate)) / 100);
+            } else {
+              taxAmt = Math.round(Number(tax.rate));
+            }
+            totalTaxAmount += taxAmt;
+            appliedTaxes.push({
+              name: tax.name,
+              code: tax.code,
+              rate: Number(tax.rate),
+              amount: taxAmt,
+            });
+          }
+        }
+      } else {
+        // Fallback standard transport GST (5%)
+        const defaultGst = Math.round(subtotal * 0.05);
+        totalTaxAmount = defaultGst;
+        appliedTaxes.push({
+          name: 'Goods & Services Tax (GST 5%)',
+          code: 'GST_5',
+          rate: 5,
+          amount: defaultGst,
+        });
+      }
+
+      // Final Total Calculated Fare & MRP/Original Fare before discount
+      const calculatedFare = Math.round(subtotal + totalTaxAmount);
       const calculatedOriginal = Math.round(
-        (isOutstation ? outstationBaseCharge * 1.2 : originalFare) * distanceMultiplier,
+        (subtotal * 1.15) + totalTaxAmount,
       );
 
       const vehicleHasAc =
@@ -176,9 +307,10 @@ export class BookingsService {
           ? true
           : true;
 
-      const rawFeatures = Array.isArray(vehicle.features) && vehicle.features.length > 0
-        ? vehicle.features
-        : config.features;
+      const rawFeatures =
+        Array.isArray(vehicle.features) && vehicle.features.length > 0
+          ? vehicle.features
+          : config.features;
 
       const sanitizedFeatures = vehicleHasAc
         ? rawFeatures
@@ -187,7 +319,10 @@ export class BookingsService {
       const badgeTag = vehicle.badgeTag || config.badgeTag;
       const etaMinutes = vehicle.etaMinutes || (2 + (idx % 6));
 
-      const displayName = vehicle.name?.trim() || vehicle.vehicleCategory || `${vehicle.make} ${vehicle.model}`;
+      const displayName =
+        vehicle.name?.trim() ||
+        vehicle.vehicleCategory ||
+        `${vehicle.make} ${vehicle.model}`;
       const similarHint = vehicle.similarModels?.trim()
         ? `${vehicle.similarModels}`
         : `${category} or similar`;
@@ -210,12 +345,22 @@ export class BookingsService {
         originalFare: calculatedOriginal,
         baseRate: baseFare,
         originalRate: originalFare,
-        baseKm: Number(vehicle.baseKm) || 10,
-        perKmRate: perKmRate,
+        baseKm: 0,
+        perKmRate: effectivePerKmRate,
         extraKmCharge: extraKmCharge,
         roundoffCostPerKm: roundoffCostPerKm,
         outstationBaseCharge: outstationBaseCharge,
         outstationPerKmCharge: outstationPerKmCharge,
+        outstationExtraCharge: outstationExtraCharge,
+        distanceKm: resolvedDistanceKm,
+        totalBillableKm: totalBillableKm,
+        extraKm: totalBillableKm,
+        distanceCharge: distanceCharge,
+        subtotal: subtotal,
+        taxAmount: totalTaxAmount,
+        taxes: appliedTaxes,
+        isRoundTrip: isRoundTrip,
+        isOutstation: isOutstation,
         seats: vehicle.seatingCapacity || 4,
         luggageBags: vehicle.luggageCapacity || config.luggageBags,
         eta: `${etaMinutes} mins away`,
@@ -225,6 +370,22 @@ export class BookingsService {
         isInstant: vehicle.isInstant ?? true,
         freeCancellation: vehicle.freeCancellation ?? true,
         tollIncluded: vehicle.tollIncluded ?? true,
+        fareBreakdown: {
+          tripType: query.tripType,
+          isRoundTrip: isRoundTrip,
+          isOutstation: isOutstation,
+          oneWayKm: resolvedDistanceKm,
+          totalBillableKm: totalBillableKm,
+          baseFare: baseFare,
+          perKmRate: effectivePerKmRate,
+          distanceCharge: distanceCharge,
+          outstationCharge: outstationExtraCharge,
+          subtotal: subtotal,
+          taxes: appliedTaxes,
+          totalTaxes: totalTaxAmount,
+          totalFare: calculatedFare,
+          tollIncluded: vehicle.tollIncluded ?? true,
+        },
       };
     });
   }
