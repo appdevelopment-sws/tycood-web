@@ -301,13 +301,15 @@ export class LocationService {
       }
     }
 
-    return {
-      placeId: `geo_${lat.toFixed(4)}_${lng.toFixed(4)}`,
+    const fallback: ReverseGeocodeResult = {
+      placeId: `geo_${this.cacheService.normalizeCoordinate(lat, 4)}_${this.cacheService.normalizeCoordinate(lng, 4)}`,
       formattedAddress: `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
       coordinates: { lat, lng },
       components: {},
       types: ['geocode'],
     };
+    this.cacheService.set(cacheKey, fallback, 10 * 60 * 1000);
+    return fallback;
   }
 
   /**
@@ -325,10 +327,8 @@ export class LocationService {
       dto.country,
     );
 
-    if (!dto.sessionToken) {
-      const cached = this.cacheService.get<AutocompletePrediction[]>(cacheKey);
-      if (cached) return cached;
-    }
+    const cached = this.cacheService.get<AutocompletePrediction[]>(cacheKey);
+    if (cached) return cached;
 
     const key = await this.ensureApiKey();
     const cleanInput = dto.input.trim();
@@ -448,6 +448,9 @@ export class LocationService {
 
     // 3. Fallback Smart Suggestions
     const fallbackMatches = this.getFallbackSuggestions(cleanInput);
+    if (fallbackMatches.length > 0) {
+      this.cacheService.set(cacheKey, fallbackMatches, 10 * 60 * 1000);
+    }
     return fallbackMatches;
   }
 
@@ -642,7 +645,7 @@ export class LocationService {
 
     // 3. Fallback coordinates by placeId match
     const coords = this.extractCoordinates(undefined, undefined, cleanPlaceId);
-    return {
+    const fallbackResult: PlaceDetailsResult = {
       placeId: cleanPlaceId,
       name: cleanPlaceId.replace(/_/g, ' '),
       formattedAddress: `${cleanPlaceId.replace(/_/g, ' ')}, Patna, Bihar`,
@@ -650,6 +653,8 @@ export class LocationService {
       components: { city: 'Patna', state: 'Bihar', country: 'India' },
       types: ['establishment'],
     };
+    this.cacheService.set(cacheKey, fallbackResult, 10 * 60 * 1000);
+    return fallbackResult;
   }
 
   /**
@@ -868,12 +873,12 @@ export class LocationService {
   async getDirections(dto: GetDirectionsDto): Promise<DirectionsResult> {
     const originStr =
       dto.originLat !== undefined && dto.originLng !== undefined
-        ? `${dto.originLat},${dto.originLng}`
-        : dto.origin || 'Patna';
+        ? `${this.cacheService.normalizeCoordinate(dto.originLat, 4)},${this.cacheService.normalizeCoordinate(dto.originLng, 4)}`
+        : dto.origin?.trim() || 'Patna';
     const destStr =
       dto.destLat !== undefined && dto.destLng !== undefined
-        ? `${dto.destLat},${dto.destLng}`
-        : dto.destination || 'Danapur';
+        ? `${this.cacheService.normalizeCoordinate(dto.destLat, 4)},${this.cacheService.normalizeCoordinate(dto.destLng, 4)}`
+        : dto.destination?.trim() || 'Danapur';
 
     const mode = dto.mode || TravelMode.DRIVING;
     const cacheKey = this.cacheService.getDirectionsKey(originStr, destStr, mode);
@@ -984,6 +989,7 @@ export class LocationService {
       steps: [],
     };
 
+    this.cacheService.set(cacheKey, fallback, LocationCacheService.TTL.DIRECTIONS);
     return fallback;
   }
 
@@ -1022,6 +1028,8 @@ export class LocationService {
 
   clearCache() {
     this.cacheService.clear();
-    return { success: true, message: 'Location cache cleared successfully' };
+    this.cachedApiKey = null;
+    this.apiKeyCacheExpiresAt = 0;
+    return { success: true, message: 'Location cache and API key cache cleared successfully' };
   }
 }
