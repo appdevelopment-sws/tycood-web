@@ -189,6 +189,21 @@ export class InitialSeedService implements OnApplicationBootstrap {
   }
 
   private async seedFleetAndBookings() {
+    if (process.env.SEED_DEMO_DATA !== 'true') {
+      this.logger.log(
+        'Demo fleet and bookings seeding skipped (set SEED_DEMO_DATA=true to seed initial demo cabs)',
+      );
+      return;
+    }
+
+    const existingVehicleCount = await this.vehicleRepo.count();
+    if (existingVehicleCount > 0) {
+      this.logger.log(
+        `Skipping demo fleet seeding: ${existingVehicleCount} vehicle(s) already exist in database.`,
+      );
+      return;
+    }
+
     // 1. Seed default customer user: rahul.kumar@gmail.com
     const customerEmail = 'rahul.kumar@gmail.com';
     const customerPhone = '+919876543210';
@@ -454,10 +469,7 @@ export class InitialSeedService implements OnApplicationBootstrap {
           ownerUserId: driverUser.id,
         });
         vehicle = await this.vehicleRepo.save(vehicle);
-      } else {
-        // Sync any updated pricing / card fields on restart
-        Object.assign(vehicle, v);
-        vehicle = await this.vehicleRepo.save(vehicle);
+        this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
       }
 
       // Assign to driver
@@ -474,7 +486,6 @@ export class InitialSeedService implements OnApplicationBootstrap {
           }),
         );
       }
-      this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
     }
 
     // 3b. Seed Delhi fleet & driver for multi-location testing

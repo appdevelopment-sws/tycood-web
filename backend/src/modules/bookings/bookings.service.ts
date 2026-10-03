@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, Brackets } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Booking } from './entities/booking.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Vehicle } from '../drivers/entities/vehicle.entity.js';
@@ -44,15 +44,7 @@ export class BookingsService {
    * Search available cabs with dynamic distance estimation & pricing based on active fleet
    */
   async getAvailableCabs(query: AvailableCabsQueryDto) {
-    // 1. Extract requested city / search term from pickup location
-    const pickupLoc = (query.pickupLocation || '').trim();
-    // Extract candidate city token (e.g. from "Jagdeopath, Patna, Bihar" -> "patna", or direct city name)
-    const locationTokens = pickupLoc
-      .split(/[,–\-\/]/)
-      .map((t) => t.trim().toLowerCase())
-      .filter((t) => t.length > 2);
-
-    // 2. Fetch active registered vehicles from database with driver & user relations
+    // 1. Fetch active registered vehicles from database with driver & user relations
     const queryBuilder = this.vehicleRepo
       .createQueryBuilder('vehicle')
       .leftJoinAndSelect('vehicle.driverVehicles', 'dv')
@@ -64,29 +56,6 @@ export class BookingsService {
       queryBuilder.andWhere('LOWER(vehicle.vehicleCategory) = LOWER(:cat)', {
         cat: query.category.trim(),
       });
-    }
-
-    // 3. Location-based matching: filter vehicles whose operating driver or owner operates in the requested city/area
-    if (locationTokens.length > 0) {
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          locationTokens.forEach((token, index) => {
-            const param = `loc_${index}`;
-            if (index === 0) {
-              qb.where(`LOWER(COALESCE(driverUser.city, 'Patna')) LIKE :${param}`, {
-                [param]: `%${token}%`,
-              });
-              qb.orWhere(`:pickupLoc ILIKE CONCAT('%', COALESCE(driverUser.city, 'Patna'), '%')`, {
-                pickupLoc: `%${pickupLoc}%`,
-              });
-            } else {
-              qb.orWhere(`LOWER(COALESCE(driverUser.city, 'Patna')) LIKE :${param}`, {
-                [param]: `%${token}%`,
-              });
-            }
-          });
-        }),
-      );
     }
 
     const vehicles = await queryBuilder.getMany();
