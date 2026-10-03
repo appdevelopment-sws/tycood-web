@@ -406,47 +406,7 @@ export class LocationService {
       }
     }
 
-    // 2. Try Legacy Places API
-    if (key) {
-      try {
-        const params = new URLSearchParams({
-          input: cleanInput,
-          key,
-        });
-        if (dto.type && dto.type !== 'all') params.append('types', dto.type);
-        if (dto.lat !== undefined && dto.lng !== undefined) {
-          params.append('location', `${dto.lat},${dto.lng}`);
-          if (dto.radius) params.append('radius', dto.radius.toString());
-        }
-        if (dto.country) {
-          params.append('components', `country:${dto.country.toLowerCase()}`);
-        }
-
-        const legacyUrl = `${this.legacyBaseUrl}/place/autocomplete/json?${params.toString()}`;
-        const legacyRes = await this.safeFetch<any>(legacyUrl);
-
-        if (legacyRes.ok && legacyRes.data?.status === 'OK' && legacyRes.data.predictions) {
-          const predictions: AutocompletePrediction[] = legacyRes.data.predictions.map((p: any) => ({
-            placeId: p.place_id,
-            description: p.description,
-            mainText: p.structured_formatting?.main_text || p.description,
-            secondaryText: p.structured_formatting?.secondary_text || '',
-            types: p.types || [],
-          }));
-
-          this.cacheService.set(
-            cacheKey,
-            predictions,
-            LocationCacheService.TTL.AUTOCOMPLETE,
-          );
-          return predictions;
-        }
-      } catch (err: any) {
-        this.logger.debug(`Legacy autocomplete error: ${err.message}`);
-      }
-    }
-
-    // 3. Fallback Smart Suggestions
+    // 2. Fallback Smart Suggestions
     const fallbackMatches = this.getFallbackSuggestions(cleanInput);
     if (fallbackMatches.length > 0) {
       this.cacheService.set(cacheKey, fallbackMatches, 10 * 60 * 1000);
@@ -556,7 +516,7 @@ export class LocationService {
         const headers: Record<string, string> = {
           'X-Goog-Api-Key': key,
           'X-Goog-FieldMask':
-            'id,displayName,formattedAddress,location,addressComponents,types,viewport',
+            'id,displayName,formattedAddress,location,addressComponents',
         };
         if (sessionToken) headers['X-Goog-Session-Token'] = sessionToken;
 
@@ -574,19 +534,6 @@ export class LocationService {
               lng: d.location?.longitude,
             },
             components,
-            types: d.types || [],
-            viewport: d.viewport
-              ? {
-                  northeast: {
-                    lat: d.viewport.high?.latitude,
-                    lng: d.viewport.high?.longitude,
-                  },
-                  southwest: {
-                    lat: d.viewport.low?.latitude,
-                    lng: d.viewport.low?.longitude,
-                  },
-                }
-              : undefined,
           };
 
           this.cacheService.set(
@@ -598,48 +545,6 @@ export class LocationService {
         }
       } catch (err: any) {
         this.logger.debug(`Places API (New) details error: ${err.message}`);
-      }
-    }
-
-    // 2. Try Legacy Place Details
-    if (key) {
-      try {
-        const params = new URLSearchParams({
-          place_id: cleanPlaceId,
-          fields:
-            'place_id,name,formatted_address,geometry,address_components,types',
-          key,
-        });
-        if (sessionToken) params.append('sessiontoken', sessionToken);
-
-        const legacyUrl = `${this.legacyBaseUrl}/place/details/json?${params.toString()}`;
-        const legacyRes = await this.safeFetch<any>(legacyUrl);
-
-        if (legacyRes.ok && legacyRes.data?.result) {
-          const res = legacyRes.data.result;
-          const components = this.parseAddressComponents(res.address_components);
-
-          const result: PlaceDetailsResult = {
-            placeId: res.place_id,
-            name: res.name || res.formatted_address,
-            formattedAddress: res.formatted_address,
-            coordinates: {
-              lat: res.geometry?.location?.lat,
-              lng: res.geometry?.location?.lng,
-            },
-            components,
-            types: res.types || [],
-          };
-
-          this.cacheService.set(
-            cacheKey,
-            result,
-            LocationCacheService.TTL.PLACE_DETAILS,
-          );
-          return result;
-        }
-      } catch (err: any) {
-        this.logger.debug(`Legacy place details error: ${err.message}`);
       }
     }
 

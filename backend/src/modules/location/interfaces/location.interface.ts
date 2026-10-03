@@ -41,7 +41,7 @@ export interface PlaceDetailsResult {
   formattedAddress: string;
   coordinates: Coordinates;
   components: AddressComponents;
-  types: string[];
+  types?: string[];
   viewport?: {
     northeast: Coordinates;
     southwest: Coordinates;
