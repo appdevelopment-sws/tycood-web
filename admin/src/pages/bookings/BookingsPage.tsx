@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Ticket, Plus, Eye, XCircle } from "lucide-react"
+import { Car, Plus, Eye, XCircle, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/common/DataTable"
@@ -16,12 +16,13 @@ import useSearchFilter from "@/hooks/useSearchFilter"
 
 import { bookingService } from "@/services/bookingService"
 import { queryKeys } from "@/lib/queryKeys"
-import type { Booking } from "@/types/bus"
+import type { Booking } from "@/types/booking"
 import BookingDialog from "@/components/dialog/BookingDialog"
 
 const INITIAL_BOOKING_FILTERS = {
   search: "",
   status: "",
+  serviceType: "",
   page: 1,
   limit: 10,
 }
@@ -34,20 +35,21 @@ export const BookingsPage = () => {
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_BOOKING_FILTERS)
 
-  const { data, isLoading } = useQuery({
+  const { data: bookingsResponse, isLoading } = useQuery({
     queryKey: queryKeys.bookings.list(filter),
     queryFn: () => bookingService.getBookings(filter),
   })
 
-  const bookingsList = data?.data || []
+  const bookingsList: Booking[] =
+    bookingsResponse?.data || (Array.isArray(bookingsResponse) ? bookingsResponse : [])
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => bookingService.cancelBooking(id),
+    mutationFn: (id: string) =>
+      bookingService.cancelBooking(id, "Cancelled by platform administrator"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all })
-      queryClient.invalidateQueries({ queryKey: queryKeys.trips.all })
       cancelDisclosure.onClose()
-      toast.success("Booking cancelled and seats released successfully")
+      toast.success("Ride booking cancelled successfully")
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to cancel booking")
@@ -77,127 +79,161 @@ export const BookingsPage = () => {
   const columns: Column<Booking>[] = useMemo(
     () => [
       {
-        header: "Ticket / PNR",
-        accessorKey: "ticketNumber",
+        header: "Ride / Booking #",
+        accessorKey: "bookingNumber",
         cell: (row) => (
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
-              <Ticket className="h-4 w-4" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 shadow-sm border border-indigo-500/20">
+              <Car className="h-5 w-5" />
             </div>
             <div>
-              <span className="font-mono font-bold text-indigo-400">
-                {row.pnr || row.ticketNumber}
-              </span>
-              <div className="text-[10px] text-slate-400">
-                {row.bookedAt ? new Date(row.bookedAt).toLocaleDateString() : "N/A"}
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {row.bookingNumber || `#CAB-${row.id?.slice(0, 8)}`}
+                </span>
+                <span className="rounded bg-indigo-500/15 px-1.5 py-0.2 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                  {row.serviceType || "CAB"}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {row.scheduledDateTime
+                  ? new Date(row.scheduledDateTime).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Scheduled"}
               </div>
             </div>
           </div>
         ),
       },
       {
-        header: "Passenger Details",
+        header: "Passenger",
         cell: (row) => (
           <div>
             <div className="font-semibold text-slate-900 dark:text-slate-100">
-              {row.passengerName}
+              {row.passengerName || row.user?.name || "Passenger"}
             </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              {row.passengerEmail || row.passengerPhone || "—"}
+            <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+              {row.passengerPhone || row.user?.phone || "—"}
             </div>
           </div>
         ),
       },
       {
-        header: "Route & Operator",
-        accessorKey: "routeName",
+        header: "Trip Route",
+        cell: (row) => (
+          <div className="max-w-[220px]">
+            <div className="flex items-center gap-1 text-xs font-medium text-slate-900 dark:text-slate-100 truncate">
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+              <span className="truncate">{row.pickupLocation}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 truncate">
+              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+              <span className="truncate">
+                {row.dropLocation || "Hourly / As Directed"}
+              </span>
+            </div>
+            <div className="mt-0.5">
+              <span className="inline-flex items-center rounded px-1.5 py-0.2 text-[9px] font-semibold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                {(row.tripType || "ONE_WAY").replace("_", " ")}
+              </span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: "Cab & Driver",
         cell: (row) => (
           <div>
             <div className="font-medium text-slate-900 dark:text-slate-100">
-              {row.routeName}
+              {row.cabName || "Cab Vehicle"} •{" "}
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {row.cabCategory || "Sedan"}
+              </span>
             </div>
-            <div className="text-[11px] text-slate-400">
-              {row.operatorName || "Express Travels"} • {row.busCategory || "AC Sleeper"}
+            <div className="font-mono text-[11px] text-indigo-500 dark:text-indigo-400">
+              {row.cabPlateNumber || "Plate Unassigned"}
+            </div>
+            <div className="text-[11px] text-slate-600 dark:text-slate-300">
+              Driver: {row.driverName || "Pending Dispatch"}
             </div>
           </div>
         ),
       },
       {
-        header: "Seats",
-        cell: (row) => (
-          <div className="flex flex-wrap gap-1">
-            {row.seatNumbers && row.seatNumbers.length > 0 ? (
-              row.seatNumbers.map((seat) => (
-                <span
-                  key={seat}
-                  className="rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-400"
-                >
-                  {seat}
+        header: "Fare & Payment",
+        cell: (row) => {
+          const total = Number(row.totalAmount || 0)
+          const advance = Number(row.advanceAmount || 0)
+          const remaining = Number(
+            row.remainingAmount !== undefined
+              ? row.remainingAmount
+              : Math.max(0, total - advance)
+          )
+          const isFullyPaid =
+            row.paymentStatus === "COMPLETED" || remaining <= 0
+
+          return (
+            <div>
+              <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                ₹{total.toFixed(2)}
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                  Adv: ₹{advance.toFixed(0)}
                 </span>
-              ))
-            ) : (
-              <span className="text-xs text-slate-400">N/A</span>
+                {!isFullyPaid && (
+                  <span className="ml-1.5 font-medium text-amber-600 dark:text-amber-400">
+                    Bal: ₹{remaining.toFixed(0)}
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-400">
+                {row.paymentMethod || "UPI"} ({row.paymentStatus || (isFullyPaid ? "COMPLETED" : "ADVANCE_PAID")})
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        header: "Status & PIN",
+        cell: (row) => (
+          <div className="space-y-1">
+            <StatusBadge status={row.status || "ACTIVE"} />
+            {row.otp && row.status !== "CANCELLED" && (
+              <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                <ShieldCheck className="h-3 w-3" /> PIN: {row.otp}
+              </div>
             )}
           </div>
         ),
       },
       {
-        header: "Payment",
-        cell: (row) => {
-          const advance =
-            row.advanceAmount !== undefined
-              ? row.advanceAmount
-              : (row.totalAmount || 0) * 0.2;
-          const remaining =
-            row.remainingAmount !== undefined
-              ? row.remainingAmount
-              : Math.max(0, (row.totalAmount || 0) - advance);
-          const isFullyPaid = row.paymentStatus === "COMPLETED" || remaining <= 0;
-
-          return (
-            <div>
-              <div className="font-bold text-emerald-400">
-                ₹{(row.totalAmount || 0).toFixed(2)}
-              </div>
-              <div className="text-[10px] text-slate-400">
-                <span className="text-emerald-400 font-medium">Adv: ₹{advance.toFixed(0)}</span>
-                {!isFullyPaid && (
-                  <span className="text-amber-400 ml-1.5 font-medium">Bal: ₹{remaining.toFixed(0)}</span>
-                )}
-              </div>
-              <div className="text-[10px] text-indigo-400 uppercase font-semibold">
-                {row.paymentMethod || "CARD"} ({row.paymentStatus || (isFullyPaid ? "COMPLETED" : "ADVANCE_PAID")})
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        header: "Status",
-        cell: (row) => <StatusBadge status={row.status || "CONFIRMED"} />,
-      },
-      {
         header: "Actions",
+        className: "text-right",
         cell: (row) => (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-1.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleOpen(row, "view")}
-              className="h-7 px-2 text-[10px] gap-1"
+              className="h-8 px-2.5 text-xs gap-1"
             >
-              <Eye className="h-3 w-3" /> Details
+              <Eye className="h-3.5 w-3.5" /> Details
             </Button>
 
-            {row.status !== "CANCELLED" && (
+            {row.status !== "CANCELLED" && row.status !== "COMPLETED" && (
               <PermissionGate resource="bookings" action="delete">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleOpenCancel(row)}
-                  className="h-7 px-2 text-[10px] text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
+                  className="h-8 px-2.5 text-xs text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 border-rose-500/30"
                 >
-                  <XCircle className="h-3 w-3 mr-1" /> Cancel
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> Cancel
                 </Button>
               </PermissionGate>
             )}
@@ -213,10 +249,10 @@ export const BookingsPage = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Bookings & Reservations
+            Cab Bookings & Ride Dispatch
           </h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Search reservation tickets, issue counter bookings, view passenger seat manifests, and manage cancellations.
+            Monitor real-time passenger reservations, dispatched fleet cabs, routes, fare collections, and trip lifecycle.
           </p>
         </div>
 
@@ -228,30 +264,41 @@ export const BookingsPage = () => {
       </div>
 
       <SectionCard
-        title="Passenger Reservations Manifest"
-        description="Filter and search all passenger bookings across operators, routes, and trips."
+        title="Ride Bookings Manifest"
+        description="Search and filter ride bookings across fleet categories, service types, and status."
       >
         <FilterBar values={filter} onChange={handleFilterChange}>
           <FilterBar.Search
             name="search"
-            placeholder="Search ticket #, PNR, passenger name, or email..."
+            placeholder="Search booking #, passenger, pickup, drop..."
             className="w-72"
+          />
+          <FilterBar.Select
+            name="serviceType"
+            placeholder="All Services"
+            options={[
+              { label: "All Services", value: "" },
+              { label: "Cab Booking", value: "CAB" },
+              { label: "Parking", value: "PARKING" },
+              { label: "Rental", value: "RENTAL" },
+              { label: "Technician", value: "TECHNICIAN" },
+            ]}
           />
           <FilterBar.Select
             name="status"
             placeholder="All Statuses"
             options={[
-              { label: "Confirmed", value: "CONFIRMED" },
-              { label: "Cancelled", value: "CANCELLED" },
-              { label: "Pending", value: "PENDING" },
+              { label: "All Statuses", value: "" },
+              { label: "Active", value: "ACTIVE" },
+              { label: "Upcoming", value: "UPCOMING" },
               { label: "Completed", value: "COMPLETED" },
+              { label: "Cancelled", value: "CANCELLED" },
             ]}
           />
         </FilterBar>
 
         <div className="mt-4">
           <DataTable
-            title="Master Passenger Bookings"
             columns={columns}
             data={bookingsList}
             isLoading={isLoading}
@@ -259,26 +306,26 @@ export const BookingsPage = () => {
         </div>
       </SectionCard>
 
-      {/* Booking Dialog Modal Drawer */}
+      {/* Booking Details / Create Modal Drawer */}
       <BookingDialog
         open={dialogDisclosure.isOpen}
         onClose={dialogDisclosure.onClose}
         booking={dialogDisclosure.data}
       />
 
-      {/* Confirm Cancellation Dialog */}
+      {/* Confirm Ride Cancellation Dialog */}
       <ConfirmDialog
         open={cancelDisclosure.isOpen}
         onOpenChange={cancelDisclosure.onClose}
-        title="Cancel Reservation Ticket"
-        description={`Are you sure you want to cancel booking ticket ${cancelDisclosure.data?.pnr || cancelDisclosure.data?.ticketNumber}? This will release the reserved seats back to available status.`}
+        title="Cancel Ride Booking"
+        description={`Are you sure you want to cancel booking "${cancelDisclosure.data?.bookingNumber || cancelDisclosure.data?.id}"? The passenger and assigned driver will be notified.`}
         onConfirm={() => {
           if (cancelDisclosure.data?.id) {
             cancelMutation.mutate(cancelDisclosure.data.id)
           }
         }}
         isLoading={cancelMutation.isPending}
-        confirmText="Cancel Booking"
+        confirmText="Cancel Ride"
         variant="danger"
       />
     </div>

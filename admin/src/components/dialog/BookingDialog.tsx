@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react"
-import { useForm, useFieldArray, type SubmitHandler } from "react-hook-form"
+import { useEffect } from "react"
+import { useForm, type SubmitHandler } from "react-hook-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -7,12 +7,22 @@ import { FormContainer } from "@/components/formContainer"
 import { FormField, FormSelectField } from "@/components/ui/form-fields"
 import { queryKeys } from "@/lib/queryKeys"
 import { bookingService } from "@/services/bookingService"
-import { tripService } from "@/services/tripService"
-import { stationService } from "@/services/stationService"
-import type { Booking, CreateBookingPayload } from "@/types/bus"
+import { cabService } from "@/services/cabService"
+import type { Booking, CreateBookingPayload } from "@/types/booking"
 import sectionHeader from "@/components/sectionHeader"
 import { StatusBadge } from "@/components/common/StatusBadge"
-import { Ticket, User, Bus, MapPin, Printer, Plus, Trash2 } from "lucide-react"
+import {
+  Car,
+  User,
+  MapPin,
+  Calendar,
+  Clock,
+  Printer,
+  ShieldCheck,
+  CreditCard,
+  Phone,
+  AlertCircle,
+} from "lucide-react"
 
 export interface BookingDrawerProps {
   open: boolean
@@ -21,21 +31,26 @@ export interface BookingDrawerProps {
 }
 
 const BOOKING_FORM_INITIAL_DATA: CreateBookingPayload = {
-  tripId: "",
-  boardingPointLocation: "",
-  droppingPointLocation: "",
-  totalAmount: 0,
+  serviceType: "CAB",
+  tripType: "ONE_WAY",
+  pickupLocation: "",
+  dropLocation: "",
+  intermediateStop: "",
+  scheduledDateTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+  returnDateTime: "",
+  cabId: "",
+  cabName: "Maruti Suzuki Dzire",
+  cabCategory: "Sedan",
+  cabPlateNumber: "",
+  baseFare: 499,
+  platformFee: 49,
+  discountAmount: 0,
+  totalAmount: 548,
+  advanceAmount: 110,
   paymentMethod: "UPI",
-  passengers: [
-    {
-      fullName: "",
-      age: 25,
-      gender: "MALE",
-      seatNumber: "L1",
-      email: "",
-      phone: "",
-    },
-  ],
+  passengerName: "",
+  passengerPhone: "",
+  pickupNotes: "",
 }
 
 export default function BookingDialog({
@@ -46,56 +61,14 @@ export default function BookingDialog({
   const isViewMode = !!booking?.viewMode
   const isEditMode = !!booking?.id && !isViewMode
 
-  // Fetch available trips for counter booking creation
-  const { data: tripsData } = useQuery({
-    queryKey: queryKeys.trips.all,
-    queryFn: () => tripService.getTrips({ limit: 50 }),
+  // Fetch active fleet cabs for vehicle selection dropdown
+  const { data: fleetCabs } = useQuery({
+    queryKey: queryKeys.cabs.all,
+    queryFn: () => cabService.getCabs({ status: "ACTIVE" }),
     enabled: open && !isViewMode,
   })
 
-  // Fetch stations for boarding & dropping point options
-  const { data: stationsList } = useQuery({
-    queryKey: queryKeys.stations.all,
-    queryFn: () => stationService.getStations(),
-    enabled: open && !isViewMode,
-  })
-
-  const trips = tripsData?.data || []
-  const stations = stationsList || []
-
-  const boardingDroppingOptions = useMemo(() => {
-    const defaultOptions = [
-      {
-        label: "Kashmere Gate ISBT, Delhi",
-        value: "Kashmere Gate ISBT, Delhi",
-      },
-      { label: "Anand Vihar ISBT, Delhi", value: "Anand Vihar ISBT, Delhi" },
-      { label: "Dadar TT Circle, Mumbai", value: "Dadar TT Circle, Mumbai" },
-      { label: "Borivali East, Mumbai", value: "Borivali East, Mumbai" },
-      {
-        label: "Interstate Bus Terminal, Jaipur",
-        value: "Interstate Bus Terminal, Jaipur",
-      },
-      {
-        label: "Majestic Bus Terminus, Bengaluru",
-        value: "Majestic Bus Terminus, Bengaluru",
-      },
-      { label: "Swargate Bus Stand, Pune", value: "Swargate Bus Stand, Pune" },
-      {
-        label: "Koyambedu Omni Bus Terminus, Chennai",
-        value: "Koyambedu Omni Bus Terminus, Chennai",
-      },
-    ]
-
-    if (!stations || stations.length === 0) return defaultOptions
-
-    const dbOptions = stations.map((s) => ({
-      label: `${s.name} (${s.city}${s.terminalName ? ` - ${s.terminalName}` : ""})`,
-      value: `${s.name}, ${s.city}`,
-    }))
-
-    return dbOptions
-  }, [stations])
+  const cabsList = fleetCabs || []
 
   const { handleSubmit, control, reset, watch, setValue } =
     useForm<CreateBookingPayload>({
@@ -103,48 +76,68 @@ export default function BookingDialog({
       mode: "onChange",
     })
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "passengers",
-  })
+  const watchedCabId = watch("cabId")
+  const watchedBaseFare = watch("baseFare")
+  const watchedPlatformFee = watch("platformFee")
+  const watchedDiscountAmount = watch("discountAmount")
 
-  const selectedTripId = watch("tripId")
-  const selectedTrip = trips.find((t) => t.id === selectedTripId)
-
-  // Update total amount automatically based on trip fare and passenger count
+  // Auto-fill cab model and category when a vehicle is selected from the fleet
   useEffect(() => {
-    if (selectedTrip && fields.length > 0) {
-      const fare = Number(selectedTrip.farePrice || selectedTrip.minFare) || 500
-      setValue("totalAmount", fare * fields.length)
+    if (watchedCabId && cabsList.length > 0) {
+      const selected = cabsList.find((c) => c.id === watchedCabId)
+      if (selected) {
+        setValue("cabName", `${selected.make || ""} ${selected.model || selected.name || "Cab"}`.trim())
+        setValue("cabCategory", selected.vehicleCategory || "Sedan")
+        setValue("cabPlateNumber", selected.registrationNumber || "")
+        if (selected.baseFare && Number(selected.baseFare) > 0) {
+          setValue("baseFare", Number(selected.baseFare))
+        }
+      }
     }
-  }, [selectedTripId, fields.length, selectedTrip, setValue])
+  }, [watchedCabId, cabsList, setValue])
+
+  // Automatically recalculate totalAmount and advanceAmount
+  useEffect(() => {
+    const base = Number(watchedBaseFare) || 0
+    const platform = Number(watchedPlatformFee) || 0
+    const discount = Number(watchedDiscountAmount) || 0
+    const calculatedTotal = Math.max(0, base + platform - discount)
+    setValue("totalAmount", calculatedTotal)
+    setValue("advanceAmount", Math.round(calculatedTotal * 0.2))
+  }, [watchedBaseFare, watchedPlatformFee, watchedDiscountAmount, setValue])
 
   useEffect(() => {
     if (open) {
       if (isViewMode || isEditMode) {
+        const schedTime = booking?.scheduledDateTime
+          ? new Date(booking.scheduledDateTime).toISOString().slice(0, 16)
+          : new Date().toISOString().slice(0, 16)
+
+        const retTime = booking?.returnDateTime
+          ? new Date(booking.returnDateTime).toISOString().slice(0, 16)
+          : ""
+
         reset({
-          tripId: booking?.tripId || "",
-          boardingPointLocation: booking?.fromStation || "",
-          droppingPointLocation: booking?.toStation || "",
-          totalAmount: booking?.totalAmount || 0,
-          paymentMethod: booking?.paymentMethod || "CARD",
-          passengers: booking?.passengers?.map((p) => ({
-            fullName: p.name,
-            age: p.age,
-            gender: p.gender as any,
-            seatNumber: p.seatNumber,
-            email: booking.passengerEmail,
-            phone: booking.passengerPhone,
-          })) || [
-            {
-              fullName: booking?.passengerName || "",
-              age: 25,
-              gender: "MALE",
-              seatNumber: booking?.seatNumbers?.[0] || "L1",
-              email: booking?.passengerEmail || "",
-              phone: booking?.passengerPhone || "",
-            },
-          ],
+          serviceType: booking?.serviceType || "CAB",
+          tripType: booking?.tripType || "ONE_WAY",
+          pickupLocation: booking?.pickupLocation || "",
+          dropLocation: booking?.dropLocation || "",
+          intermediateStop: booking?.intermediateStop || "",
+          scheduledDateTime: schedTime,
+          returnDateTime: retTime,
+          cabId: booking?.vehicleId || "",
+          cabName: booking?.cabName || "Cab",
+          cabCategory: booking?.cabCategory || "Sedan",
+          cabPlateNumber: booking?.cabPlateNumber || "",
+          baseFare: booking?.baseFare || 499,
+          platformFee: booking?.platformFee ?? 49,
+          discountAmount: booking?.discountAmount ?? 0,
+          totalAmount: booking?.totalAmount || 548,
+          advanceAmount: booking?.advanceAmount ?? 110,
+          paymentMethod: booking?.paymentMethod || "UPI",
+          passengerName: booking?.passengerName || "",
+          passengerPhone: booking?.passengerPhone || "",
+          pickupNotes: booking?.pickupNotes || "",
         })
       } else {
         reset(BOOKING_FORM_INITIAL_DATA)
@@ -156,26 +149,38 @@ export default function BookingDialog({
 
   const mutation = useMutation({
     mutationFn: (data: CreateBookingPayload) =>
-      bookingService.createBooking(data),
+      bookingService.createBooking({
+        ...data,
+        baseFare: Number(data.baseFare),
+        platformFee: Number(data.platformFee ?? 49),
+        discountAmount: Number(data.discountAmount ?? 0),
+        totalAmount: Number(data.totalAmount),
+        advanceAmount: Number(data.advanceAmount),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.bookings.all,
       })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.trips.all,
-      })
-      toast.success("Booking created successfully")
+      toast.success("Cab ride booking created successfully")
       reset()
       onClose(false)
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
       toast.error(err.message || "Failed to create booking")
     },
   })
 
   const onSubmit: SubmitHandler<CreateBookingPayload> = (data) => {
-    if (!data.tripId) {
-      toast.error("Please select a trip")
+    if (!data.pickupLocation) {
+      toast.error("Please enter a pickup address")
+      return
+    }
+    if (!data.passengerName) {
+      toast.error("Please enter passenger full name")
+      return
+    }
+    if (!data.passengerPhone) {
+      toast.error("Please enter passenger phone number")
       return
     }
     mutation.mutate(data)
@@ -192,13 +197,13 @@ export default function BookingDialog({
       onOpenChange={(isOpen) => onClose(isOpen)}
       title={
         isViewMode
-          ? `Booking Details - ${booking?.pnr || booking?.ticketNumber || ""}`
-          : "Issue New Ticket Booking"
+          ? `Ride Booking #${booking?.bookingNumber || booking?.id?.slice(0, 8) || ""}`
+          : "Issue New Ride Booking"
       }
       description={
         isViewMode
-          ? "View complete passenger manifest and reservation ticket details."
-          : "Create a counter/admin ticket reservation for passengers."
+          ? "Complete ride manifest, route tracking, assigned driver, and payment details."
+          : "Schedule and dispatch a cab ride directly from the management console."
       }
       size="xl"
       footer={
@@ -210,7 +215,7 @@ export default function BookingDialog({
               onClick={handlePrint}
               className="gap-1.5"
             >
-              <Printer className="h-4 w-4" /> Print / Save Ticket
+              <Printer className="h-4 w-4" /> Print Ride Receipt
             </Button>
           )}
 
@@ -226,405 +231,435 @@ export default function BookingDialog({
           {!isViewMode && (
             <Button
               type="submit"
-              form="booking-form"
+              form="cab-booking-form"
               disabled={mutation.isPending}
             >
-              {mutation.isPending
-                ? "Creating Reservation..."
-                : "Confirm & Issue Ticket"}
+              {mutation.isPending ? "Creating Booking..." : "Confirm & Dispatch"}
             </Button>
           )}
         </div>
       }
     >
-      {isViewMode ? (
-        /* VIEW MODE TICKET DISPLAY */
+      {isViewMode && booking ? (
+        /* VIEW MODE: LUXURY CAB RIDE SUMMARY */
         <div className="space-y-6 text-slate-800 dark:text-slate-200">
-          {/* Header Ticket Banner */}
-          <div className="rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-slate-900/40 p-6 shadow-sm">
+          {/* Header Banner */}
+          <div className="rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-slate-900/40 p-5 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-500/30">
-                  <Ticket className="h-6 w-6" />
+                  <Car className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-lg font-bold text-indigo-400">
-                      {booking?.pnr || booking?.ticketNumber}
+                    <span className="font-mono text-lg font-bold text-indigo-500 dark:text-indigo-400">
+                      {booking.bookingNumber || `#CAB-${booking.id?.slice(0, 8)}`}
                     </span>
-                    <StatusBadge status={booking?.status || "CONFIRMED"} />
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Booked on:{" "}
-                    {booking?.bookedAt
-                      ? new Date(booking.bookedAt).toLocaleString()
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-2xl font-black tracking-tight">
-                  ₹{booking?.totalAmount?.toFixed(2) || "0.00"}
-                </div>
-                <div className="text-[11px] font-medium tracking-wider text-slate-400 uppercase">
-                  Payment: {booking?.paymentStatus || "PAID"} (
-                  {booking?.paymentMethod || "CARD"})
-                </div>
-                <div className="mt-1 flex items-center justify-end gap-1.5 text-[11px]">
-                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-bold text-emerald-400 border border-emerald-500/20">
-                    Paid Advance: ₹{(booking?.advanceAmount !== undefined ? booking.advanceAmount : (booking?.totalAmount || 0) * 0.2).toFixed(2)}
-                  </span>
-                  {(booking?.remainingAmount ?? 0) > 0 && booking?.paymentStatus !== "COMPLETED" && (
-                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-400 border border-amber-500/20">
-                      Balance Due: ₹{booking.remainingAmount?.toFixed(2)}
+                    <span className="inline-flex items-center rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-400">
+                      {booking.serviceType || "CAB"}
                     </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 01: Route & Journey Details */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-            {sectionHeader("01", "Route & Journey Overview")}
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <div className="flex items-start gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
-                <MapPin className="mt-0.5 h-5 w-5 text-indigo-500" />
-                <div>
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-                    Origin Station
-                  </div>
-                  <div className="text-sm font-semibold">
-                    {booking?.fromCity}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {booking?.fromStation}
-                  </div>
-                  <div className="mt-1 font-mono text-xs font-medium text-indigo-400">
-                    Dep: {booking?.departureTime} ({booking?.departureDate})
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
-                <MapPin className="mt-0.5 h-5 w-5 text-rose-500" />
-                <div>
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-                    Destination Station
-                  </div>
-                  <div className="text-sm font-semibold">{booking?.toCity}</div>
-                  <div className="text-xs text-slate-400">
-                    {booking?.toStation}
-                  </div>
-                  <div className="mt-1 font-mono text-xs font-medium text-emerald-400">
-                    Arr: {booking?.arrivalTime} ({booking?.arrivalDate})
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg border bg-slate-50/50 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
-                <Bus className="mt-0.5 h-5 w-5 text-amber-500" />
-                <div>
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-                    Bus & Operator
-                  </div>
-                  <div className="text-sm font-semibold">
-                    {booking?.operatorName}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {booking?.busCategory}
-                  </div>
-                  <div className="mt-1 font-mono text-xs text-amber-400">
-                    Reg: {booking?.busRegistration || "N/A"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 02: Passenger Seat Manifest */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-            {sectionHeader("02", "Passenger Manifest & Seats")}
-
-            <div className="mt-4 overflow-hidden rounded-lg border dark:border-slate-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 font-semibold text-slate-500 uppercase dark:bg-slate-900/80">
-                  <tr>
-                    <th className="p-3">#</th>
-                    <th className="p-3">Passenger Name</th>
-                    <th className="p-3">Age / Gender</th>
-                    <th className="p-3">Seat Number</th>
-                    <th className="p-3 text-right">Fare Paid</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y dark:divide-slate-800">
-                  {booking?.passengers && booking.passengers.length > 0 ? (
-                    booking.passengers.map((p, idx) => (
-                      <tr
-                        key={p.id || idx}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30"
-                      >
-                        <td className="p-3 font-mono text-slate-400">
-                          {idx + 1}
-                        </td>
-                        <td className="p-3 font-semibold text-slate-200">
-                          <div className="flex items-center gap-2">
-                            <User className="h-3.5 w-3.5 text-indigo-400" />
-                            {p.name}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          {p.age} yrs / {p.gender}
-                        </td>
-                        <td className="p-3">
-                          <span className="inline-flex rounded border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 font-mono text-xs font-bold text-indigo-400">
-                            {p.seatNumber}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-400">
-                          ₹
-                          {p.farePaid
-                            ? p.farePaid.toFixed(2)
-                            : (
-                                (booking?.totalAmount || 0) /
-                                (booking?.passengers?.length || 1)
-                              ).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="p-3 font-mono text-slate-400">1</td>
-                      <td className="p-3 font-semibold text-slate-200">
-                        {booking?.passengerName}
-                      </td>
-                      <td className="p-3">25 yrs / MALE</td>
-                      <td className="p-3">
-                        <div className="flex gap-1">
-                          {booking?.seatNumbers?.map((st) => (
-                            <span
-                              key={st}
-                              className="rounded border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 font-mono text-xs font-bold text-indigo-400"
-                            >
-                              {st}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-400">
-                        ₹{booking?.totalAmount?.toFixed(2)}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Contact Details */}
-            <div className="mt-4 flex flex-wrap gap-6 rounded-lg border bg-slate-50/50 p-3.5 text-xs dark:border-slate-800 dark:bg-slate-900/40">
-              <div>
-                <span className="font-semibold text-slate-400 uppercase">
-                  Contact Email:{" "}
-                </span>
-                <span className="font-medium text-slate-200">
-                  {booking?.passengerEmail || "N/A"}
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400 uppercase">
-                  Contact Phone:{" "}
-                </span>
-                <span className="font-medium text-slate-200">
-                  {booking?.passengerPhone || "N/A"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* CREATE MODE FORM */
-        <form
-          id="booking-form"
-          onSubmit={handleSubmit(onSubmit)}
-          className="space-y-8"
-        >
-          {/* Section 01: Select Trip & Route */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-            {sectionHeader("01", "Trip & Journey Selection")}
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <FormSelectField
-                  control={control}
-                  name="tripId"
-                  label="SELECT ACTIVE SCHEDULED TRIP"
-                  required
-                  options={trips.map((t) => ({
-                    label: `${t.tripCode || t.id.slice(0, 8)} | ${t.routeName || "Route"} | Dep: ${new Date(t.departureTime).toLocaleString()} | ₹${t.farePrice || t.minFare || 500}`,
-                    value: t.id,
-                  }))}
-                />
-              </div>
-
-              <FormSelectField
-                control={control}
-                name="boardingPointLocation"
-                label="BOARDING POINT / STOP"
-                placeholder="Select Boarding Station..."
-                required
-                options={boardingDroppingOptions}
-              />
-
-              <FormSelectField
-                control={control}
-                name="droppingPointLocation"
-                label="DROPPING POINT / STOP"
-                placeholder="Select Dropping Station..."
-                required
-                options={boardingDroppingOptions}
-              />
-            </div>
-          </div>
-
-          {/* Section 02: Passenger Information */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              {sectionHeader("02", "Passenger Details")}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  append({
-                    fullName: "",
-                    age: 25,
-                    gender: "MALE",
-                    seatNumber: `L${fields.length + 1}`,
-                    email: "",
-                    phone: "",
-                  })
-                }
-                className="gap-1 text-xs"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Passenger
-              </Button>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              {fields.map((fieldItem, index) => (
-                <div
-                  key={fieldItem.id}
-                  className="relative rounded-lg border bg-slate-50/50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
-                >
-                  <div className="mb-3 flex items-center justify-between border-b pb-2 dark:border-slate-800">
-                    <span className="text-xs font-semibold text-indigo-400">
-                      Passenger #{index + 1}
+                    <span className="inline-flex items-center rounded-full bg-slate-500/20 px-2 py-0.5 text-[10px] font-semibold text-slate-400 uppercase">
+                      {(booking.tripType || "ONE_WAY").replace("_", " ")}
                     </span>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                        className="h-6 w-6 p-0 text-rose-400 hover:bg-rose-950/30"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                  </div>
+                  <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                      {booking.scheduledDateTime
+                        ? new Date(booking.scheduledDateTime).toLocaleString()
+                        : "Scheduled"}
+                    </span>
+                    {booking.otp && (
+                      <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 font-mono font-bold text-amber-500 border border-amber-500/20">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Ride PIN: {booking.otp}
+                      </span>
                     )}
                   </div>
-
-                  <div className="grid gap-4 sm:grid-cols-4">
-                    <div className="sm:col-span-2">
-                      <FormField
-                        control={control}
-                        name={`passengers.${index}.fullName`}
-                        label="PASSENGER FULL NAME"
-                        placeholder="e.g. John Doe"
-                        required
-                      />
-                    </div>
-
-                    <FormField
-                      control={control}
-                      name={`passengers.${index}.age`}
-                      label="AGE"
-                      type="number"
-                      placeholder="25"
-                      required
-                    />
-
-                    <FormSelectField
-                      control={control}
-                      name={`passengers.${index}.gender`}
-                      label="GENDER"
-                      options={[
-                        { label: "Male", value: "MALE" },
-                        { label: "Female", value: "FEMALE" },
-                        { label: "Other", value: "OTHER" },
-                      ]}
-                      required
-                    />
-
-                    <FormField
-                      control={control}
-                      name={`passengers.${index}.seatNumber`}
-                      label="SEAT NUMBER"
-                      placeholder="e.g. L1, L2, U5"
-                      required
-                    />
-
-                    <FormField
-                      control={control}
-                      name={`passengers.${index}.phone`}
-                      label="PHONE NUMBER"
-                      placeholder="+1 (555) 000-1122"
-                    />
-
-                    <div className="sm:col-span-2">
-                      <FormField
-                        control={control}
-                        name={`passengers.${index}.email`}
-                        label="EMAIL ADDRESS"
-                        type="email"
-                        placeholder="john@example.com"
-                      />
-                    </div>
-                  </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="flex items-center gap-3 sm:text-right">
+                <div>
+                  <div className="text-[11px] font-medium text-slate-400">
+                    Status
+                  </div>
+                  <StatusBadge status={booking.status || "ACTIVE"} />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Section 03: Payment & Fare Breakdown */}
-          <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
-            {sectionHeader("03", "Payment & Counter Billing")}
+          {/* Route & Trip Details */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+              Trip Route & Schedule
+            </h4>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">
+                    Pickup Location
+                  </div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
+                    {booking.pickupLocation}
+                  </div>
+                </div>
+              </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
+              {booking.intermediateStop && (
+                <div className="ml-3 flex items-start gap-3 border-l-2 border-dashed border-indigo-400/40 pl-6">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase text-indigo-400">
+                      Waypoint / Intermediate Stop
+                    </div>
+                    <div className="text-xs text-slate-700 dark:text-slate-300">
+                      {booking.intermediateStop}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-rose-500">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-rose-600 dark:text-rose-400">
+                    Dropoff Location
+                  </div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
+                    {booking.dropLocation || "As Directed / Hourly Rental"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {booking.returnDateTime && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg bg-indigo-500/10 p-2 text-xs text-indigo-400">
+                <Clock className="h-3.5 w-3.5" />
+                <span>
+                  Return Scheduled: {new Date(booking.returnDateTime).toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Passenger & Vehicle Grid */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Passenger Info */}
+            <div className="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <User className="h-4 w-4 text-indigo-500" /> Passenger Details
+              </div>
+              <div className="space-y-1">
+                <div className="font-semibold text-slate-900 dark:text-slate-100">
+                  {booking.passengerName}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <Phone className="h-3 w-3" />
+                  <span className="font-mono">{booking.passengerPhone}</span>
+                </div>
+                {booking.user?.email && (
+                  <div className="text-xs text-slate-400">
+                    Email: {booking.user.email}
+                  </div>
+                )}
+                {booking.pickupNotes && (
+                  <div className="mt-2 rounded bg-amber-500/10 p-2 text-xs text-amber-500 border border-amber-500/20">
+                    <strong>Note:</strong> {booking.pickupNotes}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cab & Driver Info */}
+            <div className="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <Car className="h-4 w-4 text-indigo-500" /> Vehicle & Assigned Driver
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {booking.cabName || "Cab Vehicle"}
+                  </span>
+                  <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-xs font-bold text-indigo-400">
+                    {booking.cabCategory || "Sedan"}
+                  </span>
+                </div>
+                <div className="font-mono text-xs text-slate-500 dark:text-slate-400">
+                  Plate: {booking.cabPlateNumber || "Unassigned"}
+                </div>
+                <div className="border-t border-slate-200/60 pt-2 dark:border-slate-800">
+                  <div className="text-xs text-slate-700 dark:text-slate-300">
+                    Driver: <span className="font-semibold">{booking.driverName || "Pending Dispatch"}</span>
+                  </div>
+                  {booking.driverPhone && (
+                    <div className="text-xs font-mono text-slate-400">
+                      Phone: {booking.driverPhone}
+                    </div>
+                  )}
+                  {booking.driverRating && (
+                    <div className="text-xs text-amber-400 font-semibold">
+                      Rating: ★ {booking.driverRating}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment & Fare Breakdown */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <CreditCard className="h-4 w-4 text-emerald-500" /> Fare Breakdown & Payment
+              </span>
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-500 border border-emerald-500/20 uppercase">
+                {booking.paymentStatus || "COMPLETED"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900">
+                <div className="text-slate-400">Base Fare</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-200">
+                  ₹{Number(booking.baseFare || 0).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900">
+                <div className="text-slate-400">Platform Fee</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-200">
+                  ₹{Number(booking.platformFee ?? 49).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900">
+                <div className="text-slate-400">Advance Paid</div>
+                <div className="font-bold text-emerald-500">
+                  ₹{Number(booking.advanceAmount || 0).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200/60 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900">
+                <div className="text-slate-400">Balance Due</div>
+                <div className="font-bold text-amber-500">
+                  ₹{Number(booking.remainingAmount || 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-3 dark:border-slate-800">
+              <div className="text-xs text-slate-400">
+                Method: <span className="font-bold text-slate-700 dark:text-slate-300">{booking.paymentMethod || "UPI"}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-slate-400 mr-2">Total Amount:</span>
+                <span className="text-lg font-bold text-emerald-500">
+                  ₹{Number(booking.totalAmount || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cancellation Info if cancelled */}
+          {booking.status === "CANCELLED" && (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-xs text-rose-400">
+              <div className="flex items-center gap-2 font-bold uppercase">
+                <AlertCircle className="h-4 w-4" /> Ride Cancelled
+              </div>
+              <p className="mt-1">
+                Reason: {booking.cancellationReason || "No cancellation reason provided"}
+              </p>
+              {booking.cancelledAt && (
+                <div className="mt-1 text-[11px] text-rose-400/80">
+                  Cancelled on: {new Date(booking.cancelledAt).toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* CREATE MODE: DISPATCH NEW RIDE */
+        <form id="cab-booking-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Section 01: Journey Route & Schedule */}
+          {sectionHeader("01", "Journey Route & Schedule")}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={control}
+              name="pickupLocation"
+              label="Pickup Location"
+              placeholder="e.g. Terminal 3, Airport Road"
+              required
+            />
+
+            <FormField
+              control={control}
+              name="dropLocation"
+              label="Dropoff Location"
+              placeholder="e.g. City Center, Connaught Place"
+              required
+            />
+
+            <FormField
+              control={control}
+              name="intermediateStop"
+              label="Intermediate Stop (Optional)"
+              placeholder="e.g. Metro Station Gate 2"
+            />
+
+            <FormSelectField
+              control={control}
+              name="tripType"
+              label="Trip Type"
+              options={[
+                { label: "One Way", value: "ONE_WAY" },
+                { label: "Round Trip", value: "ROUND_TRIP" },
+                { label: "Outstation", value: "OUTSTATION" },
+                { label: "Hourly Rental", value: "HOURLY_RENTAL" },
+                { label: "Airport Transfer", value: "AIRPORT_TRANSFER" },
+              ]}
+            />
+
+            <FormField
+              control={control}
+              name="scheduledDateTime"
+              label="Scheduled Date & Time"
+              type="datetime-local"
+              required
+            />
+
+            <FormField
+              control={control}
+              name="returnDateTime"
+              label="Return Date & Time (Round Trip)"
+              type="datetime-local"
+            />
+          </div>
+
+          {/* Section 02: Cab Vehicle & Fleet Selection */}
+          {sectionHeader("02", "Cab Category & Fleet Selection")}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {cabsList.length > 0 && (
               <FormSelectField
                 control={control}
-                name="paymentMethod"
-                label="PAYMENT METHOD"
+                name="cabId"
+                label="Assign Registered Fleet Cab"
                 options={[
-                  { label: "UPI / QR Code", value: "UPI" },
-                  { label: "Credit / Debit Card", value: "CARD" },
-                  { label: "Cash (Counter Collection)", value: "CASH" },
-                  { label: "Wallet Balance", value: "WALLET" },
+                  { label: "— Choose from active cabs —", value: "" },
+                  ...cabsList.map((c) => ({
+                    label: `${c.make || ""} ${c.model || c.name || "Cab"} (${c.registrationNumber || "No Plate"}) - ${c.vehicleCategory}`,
+                    value: c.id,
+                  })),
                 ]}
-                required
               />
+            )}
 
+            <FormSelectField
+              control={control}
+              name="cabCategory"
+              label="Cab Category"
+              options={[
+                { label: "Sedan", value: "Sedan" },
+                { label: "SUV / XL", value: "SUV / XL" },
+                { label: "Hatchback", value: "Hatchback" },
+                { label: "Electric (EV)", value: "Electric (EV)" },
+                { label: "Luxury", value: "Luxury" },
+              ]}
+            />
+
+            <FormField
+              control={control}
+              name="cabName"
+              label="Vehicle Model Name"
+              placeholder="e.g. Maruti Suzuki Dzire"
+            />
+
+            <FormField
+              control={control}
+              name="cabPlateNumber"
+              label="Registration Plate #"
+              placeholder="e.g. DL 01 AB 1234"
+            />
+          </div>
+
+          {/* Section 03: Passenger Contact Details */}
+          {sectionHeader("03", "Passenger Information")}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={control}
+              name="passengerName"
+              label="Passenger Full Name"
+              placeholder="e.g. Rahul Sharma"
+              required
+            />
+
+            <FormField
+              control={control}
+              name="passengerPhone"
+              label="Contact Phone Number"
+              placeholder="e.g. +91 98765 43210"
+              required
+            />
+
+            <div className="md:col-span-2">
               <FormField
                 control={control}
-                name="totalAmount"
-                label="TOTAL AMOUNT (₹ INR)"
-                type="number"
-                step="0.01"
-                required
+                name="pickupNotes"
+                label="Driver Pickup Notes"
+                placeholder="e.g. Near main gate, passenger with 2 suitcases"
               />
             </div>
+          </div>
+
+          {/* Section 04: Fare & Payment Details */}
+          {sectionHeader("04", "Fare Pricing & Payment Method")}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <FormField
+              control={control}
+              name="baseFare"
+              label="Base Fare (₹)"
+              type="number"
+              required
+            />
+
+            <FormField
+              control={control}
+              name="platformFee"
+              label="Platform Fee (₹)"
+              type="number"
+            />
+
+            <FormField
+              control={control}
+              name="discountAmount"
+              label="Discount (₹)"
+              type="number"
+            />
+
+            <FormField
+              control={control}
+              name="totalAmount"
+              label="Total Calculated Fare (₹)"
+              type="number"
+              readOnly
+            />
+
+            <FormSelectField
+              control={control}
+              name="paymentMethod"
+              label="Payment Method"
+              options={[
+                { label: "UPI", value: "UPI" },
+                { label: "Cash to Driver", value: "CASH" },
+                { label: "Credit/Debit Card", value: "CARD" },
+                { label: "In-App Wallet", value: "WALLET" },
+              ]}
+            />
           </div>
         </form>
       )}

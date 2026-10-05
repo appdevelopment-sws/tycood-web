@@ -27,17 +27,21 @@ export const UsersPage = () => {
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_USER_FILTERS)
 
-  const { data, isLoading } = useQuery({
+  const { data: usersResponse, isLoading } = useQuery({
     queryKey: queryKeys.users.list(filter),
     queryFn: async () => {
-      const list = await userService.getUsers({
+      const res = await userService.getUsers({
         search: filter.search || undefined,
         status: filter.status || undefined,
         role: filter.role || undefined,
+        page: filter.page || 1,
+        limit: filter.perPage || 10,
       })
-      return list
+      return res
     },
   })
+
+  const usersList = usersResponse?.data || (Array.isArray(usersResponse) ? usersResponse : [])
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => userService.deleteUser(id),
@@ -91,9 +95,10 @@ export const UsersPage = () => {
       {
         header: "User Type / Role",
         cell: (row) => {
-          const primaryRole = row.roles?.[0]?.toUpperCase() || "USER"
+          const primaryRole = row.roles?.[0]?.toUpperCase() || "CUSTOMER"
           switch (primaryRole) {
             case "SUPER_ADMIN":
+            case "ADMIN":
               return (
                 <span className="inline-flex items-center rounded-full bg-purple-500/10 px-2.5 py-0.5 text-xs font-semibold text-purple-600 dark:text-purple-400 border border-purple-500/20">
                   Super Admin
@@ -105,15 +110,23 @@ export const UsersPage = () => {
                   Driver User
                 </span>
               )
-            case "AGENT":
+            case "TECHNICIAN":
               return (
                 <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                  Booking Agent
+                  Technician
                 </span>
               )
+            case "PARKING_OPERATOR":
+              return (
+                <span className="inline-flex items-center rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-semibold text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                  Parking Operator
+                </span>
+              )
+            case "CUSTOMER":
+            case "USER":
             default:
               return (
-                <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   Passenger (User)
                 </span>
               )
@@ -136,7 +149,7 @@ export const UsersPage = () => {
         header: "Wallet Balance",
         cell: (row) => (
           <span className="font-bold text-emerald-600 dark:text-emerald-400">
-            ${(row.walletBalance ?? 0).toFixed(2)}
+            ₹{(row.walletBalance ?? 0).toFixed(2)}
           </span>
         ),
       },
@@ -228,10 +241,11 @@ export const UsersPage = () => {
               placeholder="All User Types"
               options={[
                 { label: "All User Types", value: "" },
-                { label: "Passenger (User)", value: "USER" },
+                { label: "Passenger (User)", value: "CUSTOMER" },
                 { label: "Driver User", value: "DRIVER" },
                 { label: "Super Admin", value: "SUPER_ADMIN" },
-                { label: "Booking Agent", value: "AGENT" },
+                { label: "Technician / Mechanic", value: "TECHNICIAN" },
+                { label: "Parking Operator", value: "PARKING_OPERATOR" },
               ]}
             />
             <FilterBar.Select
@@ -247,7 +261,7 @@ export const UsersPage = () => {
 
           <DataTable
             columns={columns}
-            data={data || []}
+            data={usersList}
             isLoading={isLoading}
           />
         </div>

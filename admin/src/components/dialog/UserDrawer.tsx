@@ -42,12 +42,12 @@ export default function UserDrawer({
           address: user?.address ?? "",
           emergencyContact: user?.emergencyContact ?? "",
           password: "",
-          roleName: user?.roles?.[0] ?? "USER",
+          roleName: user?.roles?.[0] === "USER" ? "CUSTOMER" : (user?.roles?.[0] ?? "CUSTOMER"),
           status: user?.status === "INACTIVE" || user?.isActive === false ? "INACTIVE" : "ACTIVE",
           isActive: user?.isActive ?? true,
         })
       } else {
-        reset(USER_FORM_INITIAL_DATA)
+        reset({ ...USER_FORM_INITIAL_DATA, roleName: "CUSTOMER" })
       }
     }
   }, [open, user, reset, isEditMode, isViewMode])
@@ -186,10 +186,11 @@ export default function UserDrawer({
             label="User Type / Role"
             disabled={isViewMode}
             options={[
-              { label: "Passenger (User)", value: "USER" },
+              { label: "Passenger (Customer)", value: "CUSTOMER" },
               { label: "Driver User", value: "DRIVER" },
               { label: "Super Admin", value: "SUPER_ADMIN" },
-              { label: "Booking Agent", value: "AGENT" },
+              { label: "Technician / Mechanic", value: "TECHNICIAN" },
+              { label: "Parking Operator", value: "PARKING_OPERATOR" },
             ]}
           />
 
