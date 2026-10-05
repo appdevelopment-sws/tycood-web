@@ -17,7 +17,10 @@ import { BusinessRole } from '../../common/enums/business-role.enum.js';
 import { RoleAssignmentStatus } from '../../common/enums/role-status.enum.js';
 import { VerificationStatus } from '../../common/enums/verification-status.enum.js';
 import { AvailabilityStatus } from '../../common/enums/availability-status.enum.js';
-import { VehicleStatus, DriverVehicleAssignmentStatus } from '../../common/enums/vehicle-status.enum.js';
+import {
+  VehicleStatus,
+  DriverVehicleAssignmentStatus,
+} from '../../common/enums/vehicle-status.enum.js';
 import {
   BookingServiceType,
   BookingStatus,
@@ -102,8 +105,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
       },
       {
         name: BusinessRole.BUS_OPERATOR,
-        displayName: 'Bus Operator Admin',
-        description: 'Manages bus fleet, schedules, and drivers',
+        displayName: ' Operator Admin',
+        description: 'Manages  fleet, schedules, and drivers',
         permissions: ['buses:read', 'buses:create', 'trips:read'],
       },
       {
@@ -299,7 +302,9 @@ export class InitialSeedService implements OnApplicationBootstrap {
           codeOfConductAccepted: true,
         });
         driverProfile = await this.driverRepo.save(driverProfile);
-        this.logger.log(`Created verified driver profile for: ${driverUser.name}`);
+        this.logger.log(
+          `Created verified driver profile for: ${driverUser.name}`,
+        );
       } else {
         driverProfile = existingLicense;
       }
@@ -331,7 +336,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         reviewsCount: 412,
         etaMinutes: 6,
         imageUrl: 'assets/car.png',
-        features: ['Compact & Fast', 'AC Included', 'Best City Commute', 'Instant Dispatch'],
+        features: [
+          'Compact & Fast',
+          'AC Included',
+          'Best City Commute',
+          'Instant Dispatch',
+        ],
         hasAc: true,
         tollIncluded: true,
         freeCancellation: true,
@@ -362,7 +372,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         reviewsCount: 1420,
         etaMinutes: 3,
         imageUrl: 'assets/car.png',
-        features: ['AC Included', 'Clean Cab', 'Top Rated Driver', 'Toll Included'],
+        features: [
+          'AC Included',
+          'Clean Cab',
+          'Top Rated Driver',
+          'Toll Included',
+        ],
         hasAc: true,
         tollIncluded: true,
         freeCancellation: true,
@@ -393,7 +408,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         reviewsCount: 2310,
         etaMinutes: 5,
         imageUrl: 'assets/car-front.png',
-        features: ['Dual AC', 'Extra Luggage Space', 'Captain Seats', 'Free Cancellation'],
+        features: [
+          'Dual AC',
+          'Extra Luggage Space',
+          'Captain Seats',
+          'Free Cancellation',
+        ],
         hasAc: true,
         tollIncluded: true,
         freeCancellation: true,
@@ -424,7 +444,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         reviewsCount: 890,
         etaMinutes: 4,
         imageUrl: 'assets/car-travelling.png',
-        features: ['Silent Drive', 'AC Included', 'Eco-friendly', 'Fast Pickup'],
+        features: [
+          'Silent Drive',
+          'AC Included',
+          'Eco-friendly',
+          'Fast Pickup',
+        ],
         hasAc: true,
         tollIncluded: true,
         freeCancellation: true,
@@ -455,7 +480,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         reviewsCount: 530,
         etaMinutes: 8,
         imageUrl: 'assets/car-front1.png',
-        features: ['Chauffeur in Uniform', 'Leather Seats', 'Bottled Water & Wi-Fi', 'Free Cancellation'],
+        features: [
+          'Chauffeur in Uniform',
+          'Leather Seats',
+          'Bottled Water & Wi-Fi',
+          'Free Cancellation',
+        ],
         hasAc: true,
         tollIncluded: true,
         freeCancellation: true,
@@ -474,7 +504,9 @@ export class InitialSeedService implements OnApplicationBootstrap {
           ownerUserId: driverUser.id,
         });
         vehicle = await this.vehicleRepo.save(vehicle);
-        this.logger.log(`Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
+        this.logger.log(
+          `Seeded fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`,
+        );
       }
 
       // Assign to driver
@@ -597,7 +629,10 @@ export class InitialSeedService implements OnApplicationBootstrap {
         vehicle = await this.vehicleRepo.save(vehicle);
 
         const existingAssignment = await this.driverVehicleRepo.findOne({
-          where: { driverProfileId: delhiDriverProfile.id, vehicleId: vehicle.id },
+          where: {
+            driverProfileId: delhiDriverProfile.id,
+            vehicleId: vehicle.id,
+          },
         });
         if (!existingAssignment) {
           await this.driverVehicleRepo.save(
@@ -609,7 +644,9 @@ export class InitialSeedService implements OnApplicationBootstrap {
             }),
           );
         }
-        this.logger.log(`Seeded Delhi fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`);
+        this.logger.log(
+          `Seeded Delhi fleet vehicle: ${v.make} ${v.model} (${v.registrationNumber})`,
+        );
       }
     }
 
@@ -654,7 +691,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           serviceType: BookingServiceType.PARKING,
           status: BookingStatus.UPCOMING,
           tripType: BookingTripType.ONE_WAY,
-          pickupLocation: 'City Center Mall • Smart Parking, Fraser Road, Patna',
+          pickupLocation:
+            'City Center Mall • Smart Parking, Fraser Road, Patna',
           dropLocation: 'Bay P2-14 • Level B2 (Covered)',
           scheduledDateTime: new Date(now.getTime() + 2 * 3600000),
           baseFare: 210,
@@ -733,7 +771,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           code: 'GST_5',
           taxType: TaxType.PERCENTAGE,
           rate: 5.0,
-          description: 'Standard transport GST applicable to intra-city and outstation cab bookings',
+          description:
+            'Standard transport GST applicable to intra-city and outstation cab bookings',
           applicableOn: TaxScope.ALL_RIDES,
           isIncludedInFare: false,
           isActive: true,
@@ -766,7 +805,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           code: 'AIRPORT_CESS',
           taxType: TaxType.FIXED,
           rate: 60.0,
-          description: 'Fixed terminal toll charge for rides originating or ending at airport terminals',
+          description:
+            'Fixed terminal toll charge for rides originating or ending at airport terminals',
           applicableOn: TaxScope.AIRPORT_RIDES,
           isIncludedInFare: false,
           isActive: true,
@@ -777,7 +817,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           code: 'NIGHT_SURCHARGE_10',
           taxType: TaxType.PERCENTAGE,
           rate: 10.0,
-          description: 'Operational peak & security surcharge applied to trips booked between 11:00 PM and 05:00 AM',
+          description:
+            'Operational peak & security surcharge applied to trips booked between 11:00 PM and 05:00 AM',
           applicableOn: TaxScope.NIGHT_RIDES,
           isIncludedInFare: false,
           isActive: true,
@@ -848,7 +889,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           key: 'TWILIO_SENDER_NUMBER',
           value: '',
           category: 'NOTIFICATIONS',
-          description: 'Twilio Registered Phone Number / Alphanumeric Sender ID',
+          description:
+            'Twilio Registered Phone Number / Alphanumeric Sender ID',
           isSecret: false,
         },
         {
@@ -862,7 +904,8 @@ export class InitialSeedService implements OnApplicationBootstrap {
           key: 'PLATFORM_CURRENCY',
           value: 'INR',
           category: 'GENERAL',
-          description: 'Default platform currency ISO 4217 code (e.g. INR, USD, EUR)',
+          description:
+            'Default platform currency ISO 4217 code (e.g. INR, USD, EUR)',
           isSecret: false,
         },
         {
@@ -876,28 +919,32 @@ export class InitialSeedService implements OnApplicationBootstrap {
           key: 'ADMIN_COMMISSION_PERCENTAGE',
           value: '20',
           category: 'GENERAL',
-          description: 'Admin commission and prepaid advance booking percentage (%)',
+          description:
+            'Admin commission and prepaid advance booking percentage (%)',
           isSecret: false,
         },
         {
           key: 'AUTO_DISPATCH_RADIUS_KM',
           value: '5',
           category: 'GENERAL',
-          description: 'Maximum search radius in kilometers for auto-dispatching nearby drivers',
+          description:
+            'Maximum search radius in kilometers for auto-dispatching nearby drivers',
           isSecret: false,
         },
         {
           key: 'DRIVER_ACCEPT_TIMEOUT_SEC',
           value: '45',
           category: 'GENERAL',
-          description: 'Seconds a driver has to accept or decline an incoming trip dispatch',
+          description:
+            'Seconds a driver has to accept or decline an incoming trip dispatch',
           isSecret: false,
         },
         {
           key: 'SUPPORT_EMAIL',
           value: 'support@cabbooking.com',
           category: 'GENERAL',
-          description: 'Official customer support email shown in rider receipt & app',
+          description:
+            'Official customer support email shown in rider receipt & app',
           isSecret: false,
         },
       ];
@@ -909,4 +956,3 @@ export class InitialSeedService implements OnApplicationBootstrap {
     }
   }
 }
-

@@ -72,7 +72,7 @@ export const DriversPage = () => {
         accessorKey: "name",
         cell: (row) => (
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500 font-bold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 font-bold text-indigo-500">
               <UserCheck className="h-4 w-4" />
             </div>
             <div>
@@ -181,7 +181,7 @@ export const DriversPage = () => {
       />
 
       <SectionCard
-        title="Verified Bus Drivers"
+        title="Drivers"
         description="Manage certified Commercial Driver Licenses (CDL), ratings, and operator assignments"
         action={
           <Button onClick={() => handleOpen()}>
@@ -192,7 +192,10 @@ export const DriversPage = () => {
       >
         <div className="space-y-4">
           <FilterBar
-            values={{ search: filter.search || "", status: filter.status || "" }}
+            values={{
+              search: filter.search || "",
+              status: filter.status || "",
+            }}
             onChange={handleFilterChange}
           >
             <FilterBar.Search
@@ -214,11 +217,7 @@ export const DriversPage = () => {
             />
           </FilterBar>
 
-          <DataTable
-            columns={columns}
-            data={drivers}
-            isLoading={isLoading}
-          />
+          <DataTable columns={columns} data={drivers} isLoading={isLoading} />
         </div>
       </SectionCard>
     </div>

@@ -86,9 +86,7 @@ export default function BusDrawer({ open, onClose, bus }: BusDrawerProps) {
         queryKey: queryKeys.buses.all,
       })
       toast.success(
-        isEditMode
-          ? "Bus updated successfully"
-          : "Bus registered successfully"
+        isEditMode ? "Bus updated successfully" : "Bus registered successfully"
       )
       reset()
       onClose(false)
@@ -107,7 +105,9 @@ export default function BusDrawer({ open, onClose, bus }: BusDrawerProps) {
       category: data.category,
       manufacturer: data.manufacturer || undefined,
       model: data.model || undefined,
-      manufacturingYear: data.manufacturingYear ? Number(data.manufacturingYear) : undefined,
+      manufacturingYear: data.manufacturingYear
+        ? Number(data.manufacturingYear)
+        : undefined,
       seatingCapacity: data.seatingCapacity ? Number(data.seatingCapacity) : 36,
       layoutType: data.layoutType,
       isAC: String(data.isAC) === "true" || data.isAC === true,
@@ -123,14 +123,18 @@ export default function BusDrawer({ open, onClose, bus }: BusDrawerProps) {
       open={open}
       onOpenChange={(isOpen) => onClose(isOpen)}
       title={
-        isViewMode ? "View Bus Vehicle" : isEditMode ? "Edit Bus Vehicle" : "Add Bus Vehicle"
+        isViewMode
+          ? "View Bus Vehicle"
+          : isEditMode
+            ? "Edit Bus Vehicle"
+            : "Add Bus Vehicle"
       }
       description={
         isViewMode
           ? "Viewing vehicle details, layout configuration, and assigned operator."
           : isEditMode
-          ? "Update vehicle specifications, status, or operator assignment."
-          : "Register a new vehicle into the fleet database."
+            ? "Update vehicle specifications, status, or operator assignment."
+            : "Register a new vehicle into the fleet database."
       }
       size="lg"
       footer={
@@ -145,22 +149,22 @@ export default function BusDrawer({ open, onClose, bus }: BusDrawerProps) {
           </Button>
 
           {!isViewMode && (
-            <Button
-              type="submit"
-              form="bus-form"
-              disabled={mutation.isPending}
-            >
+            <Button type="submit" form="bus-form" disabled={mutation.isPending}>
               {mutation.isPending
                 ? "Saving..."
                 : isEditMode
-                ? "Update Bus"
-                : "Save Bus"}
+                  ? "Update Bus"
+                  : "Save Bus"}
             </Button>
           )}
         </div>
       }
     >
-      <form id="bus-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <form
+        id="bus-form"
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-8"
+      >
         {/* Section 01: Vehicle & Operator Info */}
         <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-slate-800">
           {sectionHeader("01", "Vehicle & Operator Information")}
@@ -186,7 +190,7 @@ export default function BusDrawer({ open, onClose, bus }: BusDrawerProps) {
             <FormField
               control={control}
               name="busName"
-              label="BUS NAME / TITLE"
+              label=" NAME / TITLE"
               placeholder="e.g. Volvo B11R Multi-Axle"
               required
               readOnly={isViewMode}

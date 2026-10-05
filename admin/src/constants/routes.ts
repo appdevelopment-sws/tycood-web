@@ -152,13 +152,13 @@ export const SIDEBAR_NAVIGATION: NavSection[] = [
   {
     sectionTitle: "Administration",
     items: [
-      {
-        id: "roles",
-        title: "Roles & Permissions",
-        path: ROUTES.ROLES,
-        iconName: "ShieldCheck",
-        resourcePermission: "roles:read",
-      },
+      // {
+      //   id: "roles",
+      //   title: "Roles & Permissions",
+      //   path: ROUTES.ROLES,
+      //   iconName: "ShieldCheck",
+      //   resourcePermission: "roles:read",
+      // },
       {
         id: "settings",
         title: "System Settings",

@@ -10,7 +10,10 @@ import {
   FormFileUpload,
 } from "@/components/ui/form-fields"
 import { queryKeys } from "@/lib/queryKeys"
-import { operatorService, type CreateOperatorPayload } from "@/services/operatorService"
+import {
+  operatorService,
+  type CreateOperatorPayload,
+} from "@/services/operatorService"
 import type { BusOperator } from "@/types/bus"
 import sectionHeader from "@/components/sectionHeader"
 
@@ -45,7 +48,8 @@ export default function OperatorDrawer({
           contactEmail: operator?.contactEmail ?? "",
           contactPhone: operator?.contactPhone ?? "",
           address: operator?.address ?? "",
-          status: (operator?.status && ["ACTIVE", "INACTIVE", "SUSPENDED"].includes(operator.status)
+          status: (operator?.status &&
+          ["ACTIVE", "INACTIVE", "SUSPENDED"].includes(operator.status)
             ? operator.status
             : "ACTIVE") as "ACTIVE" | "INACTIVE" | "SUSPENDED",
           logoUrl: operator?.logoUrl ?? "",
@@ -102,15 +106,15 @@ export default function OperatorDrawer({
         isViewMode
           ? "View Operator"
           : isEditMode
-          ? "Edit Operator"
-          : "Add Operator"
+            ? "Edit Operator"
+            : "Add Operator"
       }
       description={
         isViewMode
-          ? "Viewing bus operator details."
+          ? "Viewing  operator details."
           : isEditMode
-          ? "Update bus operator details."
-          : "Create a new bus operator."
+            ? "Update  operator details."
+            : "Create a new  operator."
       }
       size="lg"
       footer={
@@ -133,8 +137,8 @@ export default function OperatorDrawer({
               {mutation.isPending
                 ? "Saving..."
                 : isEditMode
-                ? "Update Operator"
-                : "Save Operator"}
+                  ? "Update Operator"
+                  : "Save Operator"}
             </Button>
           )}
         </div>
@@ -226,4 +230,3 @@ export default function OperatorDrawer({
     </FormContainer>
   )
 }
-

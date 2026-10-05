@@ -4,10 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { FormContainer } from "@/components/formContainer"
-import {
-  FormField,
-  FormSelectField,
-} from "@/components/ui/form-fields"
+import { FormField, FormSelectField } from "@/components/ui/form-fields"
 import { queryKeys } from "@/lib/queryKeys"
 import { seatService, type CreateSeatPayload } from "@/services/seatService"
 import { busService } from "@/services/busService"
@@ -71,7 +68,8 @@ export default function SeatDrawer({
           isWindowSeat: Boolean(seat?.isWindowSeat),
           isAisleSeat: Boolean(seat?.isAisleSeat),
           isLastRow: Boolean(seat?.isLastRow),
-          isVisible: seat?.isVisible !== undefined ? Boolean(seat?.isVisible) : true,
+          isVisible:
+            seat?.isVisible !== undefined ? Boolean(seat?.isVisible) : true,
         })
       } else {
         reset({
@@ -138,15 +136,15 @@ export default function SeatDrawer({
         isViewMode
           ? "View Seat Configuration"
           : isEditMode
-          ? "Edit Physical Seat"
-          : "Add Physical Seat"
+            ? "Edit Physical Seat"
+            : "Add Physical Seat"
       }
       description={
         isViewMode
           ? "Viewing physical seat placement and matrix configuration."
           : isEditMode
-          ? "Update seat designation, deck level, or matrix coordinates."
-          : "Add a single custom seat to the selected bus physical layout."
+            ? "Update seat designation, deck level, or matrix coordinates."
+            : "Add a single custom seat to the selected bus physical layout."
       }
       size="lg"
       footer={
@@ -169,8 +167,8 @@ export default function SeatDrawer({
               {mutation.isPending
                 ? "Saving..."
                 : isEditMode
-                ? "Update Seat"
-                : "Save Seat"}
+                  ? "Update Seat"
+                  : "Save Seat"}
             </Button>
           )}
         </div>
@@ -189,8 +187,8 @@ export default function SeatDrawer({
             <FormSelectField
               control={control}
               name="busId"
-              label="BUS VEHICLE"
-              placeholder="Select target bus..."
+              label=" VEHICLE"
+              placeholder="Select target ..."
               options={busOptions}
               required
               disabled={isViewMode || isEditMode}
@@ -261,7 +259,7 @@ export default function SeatDrawer({
               control={control}
               name="isWindowSeat"
               render={({ field: { value, onChange } }) => (
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50">
                   <input
                     type="checkbox"
                     checked={!!value}
@@ -285,7 +283,7 @@ export default function SeatDrawer({
               control={control}
               name="isAisleSeat"
               render={({ field: { value, onChange } }) => (
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50">
                   <input
                     type="checkbox"
                     checked={!!value}
@@ -309,7 +307,7 @@ export default function SeatDrawer({
               control={control}
               name="isLastRow"
               render={({ field: { value, onChange } }) => (
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50">
                   <input
                     type="checkbox"
                     checked={!!value}
@@ -333,7 +331,7 @@ export default function SeatDrawer({
               control={control}
               name="isVisible"
               render={({ field: { value, onChange } }) => (
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50">
                   <input
                     type="checkbox"
                     checked={!!value}

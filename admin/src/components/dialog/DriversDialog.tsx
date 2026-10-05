@@ -4,12 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { FormContainer } from "@/components/formContainer"
-import {
-  FormField,
-  FormSelectField,
-} from "@/components/ui/form-fields"
+import { FormField, FormSelectField } from "@/components/ui/form-fields"
 import { queryKeys } from "@/lib/queryKeys"
-import { driverService, type CreateDriverPayload } from "@/services/driverService"
+import {
+  driverService,
+  type CreateDriverPayload,
+} from "@/services/driverService"
 import { operatorService } from "@/services/operatorService"
 import type { Driver } from "@/types/bus"
 import sectionHeader from "@/components/sectionHeader"
@@ -57,7 +57,8 @@ export default function DriverDrawer({
           licenseNumber: driver?.licenseNumber ?? "",
           experienceYears: driver?.experienceYears ?? 0,
           rating: driver?.rating ?? 5.0,
-          status: (driver?.status && ["ACTIVE", "ON_TRIP", "OFF_DUTY", "SUSPENDED"].includes(driver.status)
+          status: (driver?.status &&
+          ["ACTIVE", "ON_TRIP", "OFF_DUTY", "SUSPENDED"].includes(driver.status)
             ? driver.status
             : "ACTIVE") as "ACTIVE" | "ON_TRIP" | "OFF_DUTY" | "SUSPENDED",
         })
@@ -115,15 +116,15 @@ export default function DriverDrawer({
         isViewMode
           ? "View Driver Details"
           : isEditMode
-          ? "Edit Bus Driver"
-          : "Add Bus Driver"
+            ? "Edit  Driver"
+            : "Add  Driver"
       }
       description={
         isViewMode
           ? "Viewing verified Commercial Driver License (CDL) details."
           : isEditMode
-          ? "Update bus driver details and status."
-          : "Register a new certified bus driver with app access."
+            ? "Update bus driver details and status."
+            : "Register a new  driver with app access."
       }
       size="lg"
       footer={
@@ -146,8 +147,8 @@ export default function DriverDrawer({
               {mutation.isPending
                 ? "Saving..."
                 : isEditMode
-                ? "Update Driver"
-                : "Save Driver"}
+                  ? "Update Driver"
+                  : "Save Driver"}
             </Button>
           )}
         </div>
