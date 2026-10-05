@@ -26,6 +26,7 @@ import { UpdateBookingStatusDto } from './dto/update-booking-status.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { CurrentUserDto } from '../../common/interfaces/current-user.interface.js';
+import { BusinessRole } from '../../common/enums/business-role.enum.js';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -62,6 +63,32 @@ export class BookingsController {
     return this.bookingsService.createBooking(user.userId, dto);
   }
 
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'List all bookings (Admin/Fleet view or authenticated user)',
+    description:
+      'Returns a paginated list of bookings with optional serviceType, status, and search filters.',
+  })
+  @ApiResponse({ status: 200, description: 'Bookings retrieved successfully' })
+  async getAllBookings(
+    @CurrentUser() user: CurrentUserDto,
+    @Query() query: QueryBookingsDto,
+  ) {
+    const isAdmin = user.roles?.some(
+      (r) =>
+        r === 'ADMIN' ||
+        r === 'SUPER_ADMIN' ||
+        r === BusinessRole.ADMIN ||
+        r === BusinessRole.SUPER_ADMIN,
+    );
+    if (isAdmin) {
+      return this.bookingsService.getAllBookings(query);
+    }
+    return this.bookingsService.getMyBookings(user.userId, query);
+  }
+
   @Get('my-bookings')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -93,7 +120,14 @@ export class BookingsController {
     @CurrentUser() user: CurrentUserDto,
     @Param('id') id: string,
   ) {
-    return this.bookingsService.getBookingById(id, user.userId);
+    const isAdmin = user.roles?.some(
+      (r) =>
+        r === 'ADMIN' ||
+        r === 'SUPER_ADMIN' ||
+        r === BusinessRole.ADMIN ||
+        r === BusinessRole.SUPER_ADMIN,
+    );
+    return this.bookingsService.getBookingById(id, user.userId, isAdmin);
   }
 
   @Patch(':id/cancel')
@@ -112,7 +146,14 @@ export class BookingsController {
     @Param('id') id: string,
     @Body() dto: CancelBookingDto,
   ) {
-    return this.bookingsService.cancelBooking(id, user.userId, dto.reason);
+    const isAdmin = user.roles?.some(
+      (r) =>
+        r === 'ADMIN' ||
+        r === 'SUPER_ADMIN' ||
+        r === BusinessRole.ADMIN ||
+        r === BusinessRole.SUPER_ADMIN,
+    );
+    return this.bookingsService.cancelBooking(id, user.userId, dto.reason, isAdmin);
   }
 
   @Patch(':id/status')

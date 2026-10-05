@@ -27,25 +27,33 @@ export class UsersService {
     private readonly userRoleRepo: Repository<UserRole>,
   ) {}
 
-  async findAll(query: QueryUsersDto): Promise<PaginatedResult<User>> {
+  async findAll(query: QueryUsersDto): Promise<PaginatedResult<any>> {
     const qb = this.userRepo
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.userRoles', 'userRole')
-      .leftJoinAndSelect('userRole.role', 'role');
+      .leftJoinAndSelect('userRole.role', 'role')
+      .loadRelationIdAndMap('user.bookingIds', 'user.bookings');
 
-    if (query.search) {
+    if (query.search?.trim()) {
       qb.andWhere(
         '(LOWER(user.name) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search) OR user.phone LIKE :search)',
-        { search: `%${query.search}%` },
+        { search: `%${query.search.trim()}%` },
       );
     }
 
     if (query.status) {
-      qb.andWhere('user.status = :status', { status: query.status });
+      if (query.status === 'ACTIVE') {
+        qb.andWhere('(user.status = :status OR user.is_active = true)', { status: 'ACTIVE' });
+      } else if (query.status === 'INACTIVE') {
+        qb.andWhere('(user.status = :status OR user.is_active = false)', { status: 'INACTIVE' });
+      } else {
+        qb.andWhere('user.status = :status', { status: query.status });
+      }
     }
 
     if (query.role) {
-      qb.andWhere('role.name = :roleName', { roleName: query.role });
+      const resolvedRole = query.role === 'USER' ? BusinessRole.CUSTOMER : query.role;
+      qb.andWhere('role.name = :roleName', { roleName: resolvedRole });
     }
 
     const sortField = query.sortBy === 'name' ? 'user.name' : 'user.createdAt';
@@ -55,13 +63,24 @@ export class UsersService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    const formattedData = data.map((user) => {
+      const roles = (user.userRoles || [])
+        .map((ur) => ur.role?.name)
+        .filter(Boolean);
+      return {
+        ...user,
+        roles: roles.length > 0 ? roles : ['CUSTOMER'],
+        totalTripsCount: ((user as any).bookingIds && Array.isArray((user as any).bookingIds)) ? (user as any).bookingIds.length : 0,
+      };
+    });
+
     return {
-      data,
+      data: formattedData,
       meta: {
         total,
         page: query.page || 1,
         limit: query.limit || 10,
-        totalPages: Math.ceil(total / (query.limit || 10)),
+        totalPages: Math.ceil(total / (query.limit || 10)) || 1,
       },
     };
   }
@@ -114,14 +133,22 @@ export class UsersService {
       address: dto.address,
       emergencyContact: dto.emergencyContact,
       city: dto.city,
-      isActive: dto.isActive !== undefined ? dto.isActive : true,
-      status: 'ACTIVE',
+      isActive: dto.status ? dto.status === 'ACTIVE' : (dto.isActive !== undefined ? dto.isActive : true),
+      status: dto.status || 'ACTIVE',
     });
 
     const savedUser = await this.userRepo.save(user);
 
-    // Assign default role
-    const role = await this.roleRepo.findOne({ where: { name: defaultRole } });
+    // Assign role (from dto if specified, else defaultRole)
+    let assignedRoleName = defaultRole;
+    if (dto.roleName) {
+      assignedRoleName =
+        dto.roleName === 'USER'
+          ? BusinessRole.CUSTOMER
+          : (dto.roleName as BusinessRole);
+    }
+
+    const role = await this.roleRepo.findOne({ where: { name: assignedRoleName } });
     if (role) {
       await this.userRoleRepo.save(
         this.userRoleRepo.create({
@@ -164,10 +191,57 @@ export class UsersService {
     if (dto.address !== undefined) user.address = dto.address;
     if (dto.emergencyContact !== undefined) user.emergencyContact = dto.emergencyContact;
     if (dto.city !== undefined) user.city = dto.city;
-    if (dto.isActive !== undefined) user.isActive = dto.isActive;
+    if (dto.status !== undefined) {
+      user.status = dto.status;
+      user.isActive = dto.status === 'ACTIVE';
+    } else if (dto.isActive !== undefined) {
+      user.isActive = dto.isActive;
+      user.status = dto.isActive ? 'ACTIVE' : 'INACTIVE';
+    }
+
+    if (dto.roleName) {
+      const resolvedRole =
+        dto.roleName === 'USER'
+          ? BusinessRole.CUSTOMER
+          : (dto.roleName as BusinessRole);
+      const targetRole = await this.roleRepo.findOne({ where: { name: resolvedRole } });
+      if (targetRole) {
+        let userRole = await this.userRoleRepo.findOne({
+          where: { userId: user.id },
+        });
+        if (userRole) {
+          userRole.roleId = targetRole.id;
+          userRole.status = RoleAssignmentStatus.ACTIVE;
+          await this.userRoleRepo.save(userRole);
+        } else {
+          await this.userRoleRepo.save(
+            this.userRoleRepo.create({
+              userId: user.id,
+              roleId: targetRole.id,
+              status: RoleAssignmentStatus.ACTIVE,
+              approvedAt: new Date(),
+            }),
+          );
+        }
+      }
+    }
 
     await this.userRepo.save(user);
     return this.findById(id);
+  }
+
+  async delete(id: string): Promise<{ success: boolean; message: string }> {
+    const user = await this.findById(id);
+    try {
+      await this.userRoleRepo.delete({ userId: id });
+      await this.userRepo.remove(user);
+      return { success: true, message: 'User account removed successfully' };
+    } catch {
+      user.isActive = false;
+      user.status = 'INACTIVE';
+      await this.userRepo.save(user);
+      return { success: true, message: 'User account deactivated' };
+    }
   }
 
   async assignRole(

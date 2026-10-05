@@ -580,6 +580,55 @@ export class BookingsService {
   }
 
   /**
+   * Retrieve all bookings for admin / fleet view with filtering, searching, and pagination
+   */
+  async getAllBookings(
+    queryDto: QueryBookingsDto,
+  ): Promise<PaginatedResult<Booking>> {
+    const qb = this.bookingRepo
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.user', 'user')
+      .leftJoinAndSelect('booking.vehicle', 'vehicle')
+      .leftJoinAndSelect('booking.driverProfile', 'driverProfile');
+
+    if (queryDto.serviceType) {
+      qb.andWhere('booking.service_type = :serviceType', {
+        serviceType: queryDto.serviceType,
+      });
+    }
+
+    if (queryDto.status) {
+      qb.andWhere('booking.status = :status', { status: queryDto.status });
+    }
+
+    if (queryDto.search?.trim()) {
+      const searchTerm = `%${queryDto.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.cab_name) LIKE :searchTerm OR LOWER(booking.driver_name) LIKE :searchTerm OR LOWER(booking.passenger_name) LIKE :searchTerm OR LOWER(booking.passenger_phone) LIKE :searchTerm)',
+        { searchTerm },
+      );
+    }
+
+    qb.orderBy('booking.created_at', 'DESC');
+    qb.skip(queryDto.skip);
+    qb.take(queryDto.limit || 10);
+
+    const [data, total] = await qb.getManyAndCount();
+    const limit = queryDto.limit || 10;
+    const page = queryDto.page || 1;
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  /**
    * Retrieve bookings for the authenticated user with filtering, searching, and pagination
    */
   async getMyBookings(
@@ -630,16 +679,24 @@ export class BookingsService {
   /**
    * Retrieve single booking by ID or bookingNumber
    */
-  async getBookingById(id: string, userId: string): Promise<Booking> {
+  async getBookingById(
+    id: string,
+    userId?: string,
+    isAdmin = false,
+  ): Promise<Booking> {
     const qb = this.bookingRepo
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.vehicle', 'vehicle')
       .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
       .where(
-        '(booking.id = :id OR booking.booking_number = :id) AND booking.user_id = :userId',
-        { id, userId },
+        '(booking.id = :id OR booking.booking_number = :id)',
+        { id },
       );
+
+    if (!isAdmin && userId) {
+      qb.andWhere('booking.user_id = :userId', { userId });
+    }
 
     const booking = await qb.getOne();
     if (!booking) {
@@ -656,16 +713,16 @@ export class BookingsService {
     id: string,
     userId: string,
     reason: string,
+    isAdmin = false,
   ): Promise<Booking> {
-    const booking = await this.getBookingById(id, userId);
+    const booking = await this.getBookingById(id, userId, isAdmin);
 
-    if (
-      booking.status !== BookingStatus.ACTIVE &&
-      booking.status !== BookingStatus.UPCOMING
-    ) {
-      throw new BadRequestException(
-        `Cannot cancel booking with status ${booking.status}. Only ACTIVE or UPCOMING bookings can be cancelled.`,
-      );
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException('Booking is already cancelled.');
+    }
+
+    if (booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException('Completed bookings cannot be cancelled.');
     }
 
     const queryRunner = this.dataSource.createQueryRunner();

@@ -110,4 +110,13 @@ export class UsersController {
   ) {
     return this.usersService.removeRole(id, roleId);
   }
+
+  @Delete(':id')
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete or deactivate user account (Admin only)' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
+  @ApiResponse({ status: 200, description: 'User deleted or deactivated' })
+  async delete(@Param('id') id: string) {
+    return this.usersService.delete(id);
+  }
 }
