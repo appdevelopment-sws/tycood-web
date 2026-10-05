@@ -143,16 +143,34 @@ export const BookingsPage = () => {
       },
       {
         header: "Payment",
-        cell: (row) => (
-          <div>
-            <div className="font-bold text-emerald-400">
-              ₹{(row.totalAmount || 0).toFixed(2)}
+        cell: (row) => {
+          const advance =
+            row.advanceAmount !== undefined
+              ? row.advanceAmount
+              : (row.totalAmount || 0) * 0.2;
+          const remaining =
+            row.remainingAmount !== undefined
+              ? row.remainingAmount
+              : Math.max(0, (row.totalAmount || 0) - advance);
+          const isFullyPaid = row.paymentStatus === "COMPLETED" || remaining <= 0;
+
+          return (
+            <div>
+              <div className="font-bold text-emerald-400">
+                ₹{(row.totalAmount || 0).toFixed(2)}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                <span className="text-emerald-400 font-medium">Adv: ₹{advance.toFixed(0)}</span>
+                {!isFullyPaid && (
+                  <span className="text-amber-400 ml-1.5 font-medium">Bal: ₹{remaining.toFixed(0)}</span>
+                )}
+              </div>
+              <div className="text-[10px] text-indigo-400 uppercase font-semibold">
+                {row.paymentMethod || "CARD"} ({row.paymentStatus || (isFullyPaid ? "COMPLETED" : "ADVANCE_PAID")})
+              </div>
             </div>
-            <div className="text-[10px] text-slate-400 uppercase">
-              {row.paymentMethod || "CARD"} ({row.paymentStatus || "PAID"})
-            </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         header: "Status",

@@ -51,6 +51,11 @@ export class InitialSeedService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    try {
+      await this.bookingRepo.query(
+        "ALTER TYPE bookings_payment_status_enum ADD VALUE IF NOT EXISTS 'ADVANCE_PAID';",
+      );
+    } catch (_) {}
     await this.seedRoles();
     await this.seedAdmin();
     await this.seedFleetAndBookings();
@@ -865,6 +870,13 @@ export class InitialSeedService implements OnApplicationBootstrap {
           value: '49',
           category: 'GENERAL',
           description: 'Platform facilitation service fee charged per ride',
+          isSecret: false,
+        },
+        {
+          key: 'ADMIN_COMMISSION_PERCENTAGE',
+          value: '20',
+          category: 'GENERAL',
+          description: 'Admin commission and prepaid advance booking percentage (%)',
           isSecret: false,
         },
         {

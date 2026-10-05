@@ -140,6 +140,33 @@ export class CreateBookingDto {
   totalAmount: number;
 
   @ApiPropertyOptional({
+    example: 120,
+    description: 'Prepaid advance booking amount paid upfront by passenger',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  advanceAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 478,
+    description: 'Remaining fare balance payable after ride completion',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  remainingAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Admin commission percentage used for advance calculation',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  adminCommissionRate?: number;
+
+  @ApiPropertyOptional({
     example: 'UPI',
     default: 'UPI',
     description: 'Payment method chosen (UPI, CARD, CASH, WALLET)',

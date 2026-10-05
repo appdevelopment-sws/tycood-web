@@ -15,6 +15,7 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity.js';
 import { Tax } from '../taxes/entities/tax.entity.js';
 import { TaxType } from '../taxes/enums/tax-type.enum.js';
 import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
+import { SystemSetting } from '../settings/entities/system-setting.entity.js';
 import { LocationService } from '../location/location.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
 import { QueryBookingsDto } from './dto/query-bookings.dto.js';
@@ -477,7 +478,33 @@ export class BookingsService {
         }
       }
 
-      // 4. Create booking entity
+      // 4. Compute advance commission & balance amount
+      let commissionRate = dto.adminCommissionRate;
+      if (commissionRate === undefined || commissionRate === null) {
+        const commissionSetting = await queryRunner.manager.findOne(SystemSetting, {
+          where: { key: 'ADMIN_COMMISSION_PERCENTAGE' },
+        });
+        commissionRate = commissionSetting?.value
+          ? parseFloat(commissionSetting.value)
+          : 20;
+      }
+
+      const advanceAmount =
+        dto.advanceAmount !== undefined && dto.advanceAmount !== null
+          ? dto.advanceAmount
+          : Math.round((dto.totalAmount * (commissionRate / 100)));
+
+      const remainingAmount =
+        dto.remainingAmount !== undefined && dto.remainingAmount !== null
+          ? dto.remainingAmount
+          : Math.max(0, dto.totalAmount - advanceAmount);
+
+      const resolvedPaymentStatus =
+        remainingAmount > 0
+          ? PaymentStatus.ADVANCE_PAID
+          : PaymentStatus.COMPLETED;
+
+      // 5. Create booking entity
       const passengerName =
         dto.passengerName?.trim() || user.name || 'Rahul Kumar';
       const passengerPhone =
@@ -498,8 +525,11 @@ export class BookingsService {
         platformFee: dto.platformFee ?? 49,
         discountAmount: dto.discountAmount ?? 0,
         totalAmount: dto.totalAmount,
+        advanceAmount,
+        remainingAmount,
+        adminCommissionRate: commissionRate,
         paymentMethod: dto.paymentMethod || 'UPI',
-        paymentStatus: PaymentStatus.COMPLETED,
+        paymentStatus: resolvedPaymentStatus,
         passengerName,
         passengerPhone,
         pickupNotes: dto.pickupNotes || null,
@@ -519,6 +549,9 @@ export class BookingsService {
           fareBreakdown: dto.metadata?.fareBreakdown || {
             baseFare: dto.baseFare,
             totalAmount: dto.totalAmount,
+            advanceAmount,
+            remainingAmount,
+            adminCommissionRate: commissionRate,
             platformFee: dto.platformFee ?? 49,
             discountAmount: dto.discountAmount ?? 0,
             appliedTaxes: dto.metadata?.appliedTaxes || [],
@@ -678,6 +711,10 @@ export class BookingsService {
     }
 
     booking.status = dto.status;
+    if (dto.status === BookingStatus.COMPLETED) {
+      booking.paymentStatus = PaymentStatus.COMPLETED;
+      booking.remainingAmount = 0;
+    }
     return this.bookingRepo.save(booking);
   }
 }

@@ -220,8 +220,11 @@ export interface Booking {
   seatNumbers: string[];
   totalAmount: number;
   totalPaidAmount?: number;
+  advanceAmount?: number;
+  remainingAmount?: number;
+  adminCommissionRate?: number;
   paymentMethod: 'CARD' | 'UPI' | 'WALLET' | 'CASH' | string;
-  paymentStatus?: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED' | string;
+  paymentStatus?: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED' | 'ADVANCE_PAID' | string;
   status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | string;
   rawStatus?: string;
   fromCity?: string;

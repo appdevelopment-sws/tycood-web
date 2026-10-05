@@ -271,6 +271,16 @@ export default function BookingDialog({
                   Payment: {booking?.paymentStatus || "PAID"} (
                   {booking?.paymentMethod || "CARD"})
                 </div>
+                <div className="mt-1 flex items-center justify-end gap-1.5 text-[11px]">
+                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-bold text-emerald-400 border border-emerald-500/20">
+                    Paid Advance: ₹{(booking?.advanceAmount !== undefined ? booking.advanceAmount : (booking?.totalAmount || 0) * 0.2).toFixed(2)}
+                  </span>
+                  {(booking?.remainingAmount ?? 0) > 0 && booking?.paymentStatus !== "COMPLETED" && (
+                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-400 border border-amber-500/20">
+                      Balance Due: ₹{booking.remainingAmount?.toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

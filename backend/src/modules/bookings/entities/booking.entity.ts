@@ -115,6 +115,36 @@ export class Booking {
   })
   totalAmount: number;
 
+  @Column({
+    name: 'advance_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0.0,
+    transformer: numericTransformer,
+  })
+  advanceAmount: number;
+
+  @Column({
+    name: 'remaining_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0.0,
+    transformer: numericTransformer,
+  })
+  remainingAmount: number;
+
+  @Column({
+    name: 'admin_commission_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 20.0,
+    transformer: numericTransformer,
+  })
+  adminCommissionRate: number;
+
   @Column({ name: 'payment_method', type: 'varchar', length: 50, default: 'UPI' })
   paymentMethod: string;
 

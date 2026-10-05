@@ -20,7 +20,6 @@ import {
   Copy,
   Check,
   CreditCard,
-  Bell,
   Cloud,
   MapPin,
   Sparkles,
@@ -986,6 +985,59 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {/* Admin Commission & Prepaid Advance Setting Card */}
+            <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-5 dark:border-amber-500/20">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
+                      <Percent className="h-4 w-4" />
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Admin Commission & Prepaid Booking Advance
+                    </h4>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+                      Active Booking Logic
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 max-w-2xl">
+                    Users pay only this percentage amount as upfront prepaid booking advance before ride confirmation. The remaining balance ({100 - (Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20)}%) is paid to the driver after ride completion.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative w-36">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={editedKeys["ADMIN_COMMISSION_PERCENTAGE"] ?? "20"}
+                      onChange={(e) =>
+                        handleKeyChange("ADMIN_COMMISSION_PERCENTAGE", e.target.value)
+                      }
+                      placeholder="20"
+                      className="w-full rounded-xl border border-amber-400 bg-white py-2.5 pr-8 pl-3.5 text-sm font-bold text-slate-900 transition outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-amber-500/40 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                    <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm font-bold text-amber-600 dark:text-amber-400">
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic split explanation example */}
+              <div className="mt-3.5 flex flex-wrap items-center gap-3 pt-3 border-t border-amber-500/20 text-xs">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Example on ₹1,000 Fare:</span>
+                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Prepaid Now: ₹{((1000 * (Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20)) / 100).toFixed(0)} ({Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20}%)
+                </span>
+                <span className="rounded-md bg-indigo-500/10 px-2 py-0.5 font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  Balance on Drop: ₹{(1000 - (1000 * (Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20)) / 100).toFixed(0)} ({100 - (Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20)}%)
+                </span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold tracking-wider text-slate-700 uppercase dark:text-slate-300">

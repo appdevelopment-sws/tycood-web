@@ -1,17 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SystemSetting } from './entities/system-setting.entity.js';
 import { UpdateSettingsDto } from './dto/update-settings.dto.js';
 
 @Injectable()
-export class SettingsService {
+export class SettingsService implements OnModuleInit {
   private readonly logger = new Logger(SettingsService.name);
 
   constructor(
     @InjectRepository(SystemSetting)
     private readonly settingRepo: Repository<SystemSetting>,
   ) {}
+
+  async onModuleInit() {
+    await this.seedDefaultSettings();
+  }
 
   async getAllSettings(includeSecrets = false) {
     const list = await this.settingRepo.find({
@@ -228,6 +232,13 @@ export class SettingsService {
         value: '49',
         category: 'GENERAL',
         description: 'Platform facilitation service fee charged per ride',
+        isSecret: false,
+      },
+      {
+        key: 'ADMIN_COMMISSION_PERCENTAGE',
+        value: '20',
+        category: 'GENERAL',
+        description: 'Admin commission and prepaid advance booking percentage (%) required upfront',
         isSecret: false,
       },
       {
