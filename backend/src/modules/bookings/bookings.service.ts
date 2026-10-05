@@ -444,11 +444,11 @@ export class BookingsService {
       // 3. Resolve vehicle & driver details
       let vehicleId: string | null = null;
       let driverProfileId: string | null = null;
-      let driverName = 'Ramesh Kumar';
-      let driverPhone = '+91 98351 24789';
+      let driverName: string | null = null;
+      let driverPhone: string | null = null;
       let driverRating = 4.9;
-      let cabPlateNumber = dto.cabPlateNumber || 'BR 01 EA 4521';
-      let cabName = dto.cabName || 'Maruti Suzuki Dzire';
+      let cabPlateNumber: string | null = dto.cabPlateNumber || null;
+      let cabName = dto.cabName || 'Cab';
       let cabCategory = dto.cabCategory || 'Sedan';
 
       if (dto.cabId) {
@@ -470,9 +470,10 @@ export class BookingsService {
           const assignedDriver = vehicle.driverVehicles?.[0]?.driverProfile;
           if (assignedDriver) {
             driverProfileId = assignedDriver.id;
+            driverRating = 4.9;
             if (assignedDriver.user) {
               driverName = assignedDriver.user.name;
-              driverPhone = assignedDriver.user.phone || driverPhone;
+              driverPhone = assignedDriver.user.phone || null;
             }
           }
         }
