@@ -1,15 +1,6 @@
 import React, { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import {
-  Menu,
-  Search,
-  Bell,
-  LogOut,
-  User,
-  Shield,
-  Sun,
-  Moon,
-} from "lucide-react"
+import { Menu, Bell, LogOut, User, Shield, Sun, Moon } from "lucide-react"
 import { useAuth } from "../../hooks/useAuth"
 import { useTheme } from "../theme-provider"
 import { ROUTES, SIDEBAR_NAVIGATION } from "../../constants/routes"
