@@ -35,6 +35,9 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     Tax,
     SystemSetting,
   ],
-  synchronize: process.env.NODE_ENV !== 'production', // Automatically creates tables in dev
+  synchronize:
+    process.env.DB_SYNCHRONIZE !== undefined
+      ? process.env.DB_SYNCHRONIZE === 'true'
+      : true,
   logging: process.env.NODE_ENV === 'development',
 });

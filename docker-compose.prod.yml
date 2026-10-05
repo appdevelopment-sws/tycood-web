@@ -59,6 +59,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminPassword123!}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      DB_SYNCHRONIZE: "true"
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     ports:
       - "${BACKEND_PORT:-3010}:3000"
