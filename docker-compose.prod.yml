@@ -61,7 +61,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT:-3000}:3010"
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
