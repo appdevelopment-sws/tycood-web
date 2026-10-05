@@ -123,6 +123,18 @@ export class BookingsService {
       ? Math.round(resolvedDistanceKm * 2 * 10) / 10
       : Math.round(resolvedDistanceKm * 10) / 10;
 
+    // Trip characteristics for conditional taxes and surcharges
+    const isAirportRide =
+      /airport|aerodrome|terminal|t1|t2|t3/i.test(query.pickupLocation || '') ||
+      /airport|aerodrome|terminal|t1|t2|t3/i.test(query.dropLocation || '') ||
+      (query as any).isAirportRide === true ||
+      (query as any).serviceType === 'AIRPORT';
+
+    const scheduledDate = query.startDate ? new Date(query.startDate) : new Date();
+    const scheduledHour = scheduledDate.getHours();
+    // Night ride window: 23:00 (11 PM) to 05:00 (5 AM)
+    const isNightRide = scheduledHour >= 23 || scheduledHour < 5;
+
     // 3. Fetch active taxes and surcharges from database
     let activeTaxes: Tax[] = [];
     try {
@@ -256,17 +268,22 @@ export class BookingsService {
         name: string;
         code: string;
         rate: number;
+        taxType: TaxType;
+        applicableOn: TaxScope;
         amount: number;
       }> = [];
       let totalTaxAmount = 0;
 
       if (activeTaxes.length > 0) {
         for (const tax of activeTaxes) {
-          if (
+          const appliesToTrip =
             tax.applicableOn === TaxScope.ALL_RIDES ||
             (tax.applicableOn === TaxScope.OUTSTATION && isOutstation) ||
-            (tax.applicableOn === TaxScope.INTERCITY_ONLY && isOutstation)
-          ) {
+            (tax.applicableOn === TaxScope.INTERCITY_ONLY && isOutstation) ||
+            (tax.applicableOn === TaxScope.AIRPORT_RIDES && isAirportRide) ||
+            (tax.applicableOn === TaxScope.NIGHT_RIDES && isNightRide);
+
+          if (appliesToTrip) {
             let taxAmt = 0;
             if (tax.taxType === TaxType.PERCENTAGE) {
               taxAmt = Math.round((subtotal * Number(tax.rate)) / 100);
@@ -278,6 +295,8 @@ export class BookingsService {
               name: tax.name,
               code: tax.code,
               rate: Number(tax.rate),
+              taxType: tax.taxType,
+              applicableOn: tax.applicableOn,
               amount: taxAmt,
             });
           }
@@ -290,6 +309,8 @@ export class BookingsService {
           name: 'Goods & Services Tax (GST 5%)',
           code: 'GST_5',
           rate: 5,
+          taxType: TaxType.PERCENTAGE,
+          applicableOn: TaxScope.ALL_RIDES,
           amount: defaultGst,
         });
       }
@@ -374,6 +395,8 @@ export class BookingsService {
           tripType: query.tripType,
           isRoundTrip: isRoundTrip,
           isOutstation: isOutstation,
+          isAirportRide: isAirportRide,
+          isNightRide: isNightRide,
           oneWayKm: resolvedDistanceKm,
           totalBillableKm: totalBillableKm,
           baseFare: baseFare,
@@ -492,6 +515,16 @@ export class BookingsService {
         metadata: {
           ...dto.metadata,
           appliedCoupon: dto.appliedCoupon || null,
+          appliedTaxes: dto.metadata?.appliedTaxes || [],
+          fareBreakdown: dto.metadata?.fareBreakdown || {
+            baseFare: dto.baseFare,
+            totalAmount: dto.totalAmount,
+            platformFee: dto.platformFee ?? 49,
+            discountAmount: dto.discountAmount ?? 0,
+            appliedTaxes: dto.metadata?.appliedTaxes || [],
+            distanceKm: dto.metadata?.distanceKm || 0,
+            distanceCharge: dto.metadata?.distanceCharge || 0,
+          },
         },
       });
 

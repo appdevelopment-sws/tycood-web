@@ -801,7 +801,7 @@ export const SettingsPage: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Payment Gateways (Razorpay & Stripe)
+                  Payment Gateways (Razorpay)
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Process UPI, credit/debit cards, and mobile wallets with

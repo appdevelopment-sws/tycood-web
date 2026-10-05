@@ -68,6 +68,14 @@ export class AvailableCabsQueryDto {
   dropLng?: number;
 
   @ApiPropertyOptional({
+    example: '2026-10-06T10:00:00Z',
+    description: 'Scheduled start date / pickup time for the ride',
+  })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiPropertyOptional({
     example: '2026-10-06',
     description: 'Return date string for round-trip travel',
   })
