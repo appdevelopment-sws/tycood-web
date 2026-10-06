@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ParkingOperator } from './entities/parking-operator.entity';
 import { ParkingLocation } from './entities/parking-location.entity';
 import { CreateParkingLocationDto } from './dto/create-parking-location.dto';
@@ -15,7 +15,12 @@ import { QueryParkingLocationsDto } from './dto/query-parking-locations.dto';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { VerificationStatus } from '../../common/enums/verification-status.enum';
 import { ParkingLocationStatus } from '../../common/enums/parking-status.enum';
-import { BusinessRole } from '../../common/enums/business-role.enum';
+import { Role } from '../users/entities/role.entity';
+import { UserRole } from '../users/entities/user-role.entity';
+import { ProfessionalApplication } from '../applications/entities/professional-application.entity';
+import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role.enum';
+import { ApplicationStatus } from '../../common/enums/application-status.enum';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
 import { ICurrentUser } from '../../common/interfaces/current-user.interface';
 
 @Injectable()
@@ -25,6 +30,7 @@ export class ParkingService {
     private readonly operatorRepo: Repository<ParkingOperator>,
     @InjectRepository(ParkingLocation)
     private readonly locationRepo: Repository<ParkingLocation>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findOperatorByUserId(userId: string): Promise<ParkingOperator> {
@@ -239,5 +245,142 @@ export class ParkingService {
         totalPages: Math.ceil(total / (query.limit || 10)),
       },
     };
+  }
+
+  async findAllOperators(query: any): Promise<PaginatedResult<ParkingOperator>> {
+    const qb = this.operatorRepo
+      .createQueryBuilder('op')
+      .leftJoinAndSelect('op.user', 'user')
+      .leftJoinAndSelect('op.locations', 'loc');
+
+    if (query?.verificationStatus) {
+      qb.andWhere('op.verificationStatus = :status', { status: query.verificationStatus });
+    }
+
+    if (query?.search) {
+      qb.andWhere(
+        '(LOWER(op.facilityName) LIKE LOWER(:search) OR LOWER(op.ownerName) LIKE LOWER(:search) OR op.businessPhone LIKE :search OR LOWER(user.name) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('op.createdAt', query?.sortOrder || 'DESC');
+    const limit = Number(query?.limit) || 10;
+    const page = Number(query?.page) || 1;
+    const skip = (page - 1) * limit;
+    qb.skip(skip).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async verifyOperator(id: string, adminId: string, notes?: string): Promise<ParkingOperator> {
+    const operator = await this.operatorRepo.findOne({
+      where: { id },
+      relations: { user: true, locations: true },
+    });
+    if (!operator) {
+      throw new NotFoundException(`Parking operator not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      operator.verificationStatus = VerificationStatus.VERIFIED;
+      const saved = await manager.save(operator);
+
+      // Activate operator's facilities
+      await manager.update(
+        ParkingLocation,
+        { operatorId: operator.id },
+        { status: ParkingLocationStatus.ACTIVE },
+      );
+
+      // Assign PARKING_OPERATOR role to user
+      const role = await manager.findOne(Role, { where: { name: BusinessRole.PARKING_OPERATOR } });
+      if (role) {
+        let userRole = await manager.findOne(UserRole, {
+          where: { userId: operator.userId, roleId: role.id },
+        });
+        if (userRole) {
+          userRole.status = RoleAssignmentStatus.APPROVED;
+          userRole.approvedAt = new Date();
+          userRole.approvedBy = adminId;
+          await manager.save(userRole);
+        } else {
+          await manager.save(
+            manager.create(UserRole, {
+              userId: operator.userId,
+              roleId: role.id,
+              status: RoleAssignmentStatus.APPROVED,
+              approvedAt: new Date(),
+              approvedBy: adminId,
+            }),
+          );
+        }
+      }
+
+      // Update any pending applications
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: operator.userId,
+          requestedRole: ProfessionalRole.PARKING_OPERATOR,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          notes: notes || 'Verified by admin',
+        },
+      );
+
+      return saved;
+    });
+  }
+
+  async rejectOperator(id: string, adminId: string, rejectionReason?: string): Promise<ParkingOperator> {
+    const operator = await this.operatorRepo.findOne({
+      where: { id },
+    });
+    if (!operator) {
+      throw new NotFoundException(`Parking operator not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      operator.verificationStatus = VerificationStatus.REJECTED;
+      const saved = await manager.save(operator);
+
+      await manager.update(
+        ParkingLocation,
+        { operatorId: operator.id },
+        { status: ParkingLocationStatus.INACTIVE },
+      );
+
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: operator.userId,
+          requestedRole: ProfessionalRole.PARKING_OPERATOR,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.REJECTED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          rejectionReason: rejectionReason || 'Rejected by platform admin',
+        },
+      );
+
+      return saved;
+    });
   }
 }

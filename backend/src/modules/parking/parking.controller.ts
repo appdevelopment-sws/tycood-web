@@ -21,6 +21,9 @@ import { UpdateParkingLocationDto } from './dto/update-parking-location.dto';
 import { UpdateParkingInventoryDto } from './dto/update-parking-inventory.dto';
 import { QueryParkingLocationsDto } from './dto/query-parking-locations.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { BusinessRole } from '../../common/enums/business-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentUserDto } from '../../common/interfaces/current-user.interface';
 
@@ -91,5 +94,47 @@ export class ParkingController {
     @Body() dto: UpdateParkingInventoryDto,
   ) {
     return this.parkingService.updateInventory(id, user, dto);
+  }
+
+  // --- Operator Administration Endpoints ---
+
+  @Get('operators')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all registered parking operators (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Paginated parking operators list' })
+  async findAllOperators(@Query() query: any) {
+    return this.parkingService.findAllOperators(query);
+  }
+
+  @Patch('operators/:id/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify parking operator and assign role (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Operator UUID' })
+  @ApiResponse({ status: 200, description: 'Verified parking operator record' })
+  async verifyOperator(
+    @Param('id') id: string,
+    @Body() dto: { notes?: string },
+    @CurrentUser() admin: CurrentUserDto,
+  ) {
+    return this.parkingService.verifyOperator(id, admin.userId, dto?.notes);
+  }
+
+  @Patch('operators/:id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reject parking operator (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Operator UUID' })
+  @ApiResponse({ status: 200, description: 'Rejected parking operator record' })
+  async rejectOperator(
+    @Param('id') id: string,
+    @Body() dto: { rejectionReason?: string },
+    @CurrentUser() admin: CurrentUserDto,
+  ) {
+    return this.parkingService.rejectOperator(id, admin.userId, dto?.rejectionReason);
   }
 }

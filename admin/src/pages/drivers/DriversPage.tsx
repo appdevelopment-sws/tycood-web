@@ -1,6 +1,15 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Eye, Trash2, UserCheck, Star } from "lucide-react"
+import {
+  Plus,
+  Pencil,
+  Eye,
+  Trash2,
+  UserCheck,
+  Star,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/common/DataTable"
@@ -24,6 +33,8 @@ export const DriversPage = () => {
 
   const drawerDisclosure = useDisclosure<any>()
   const deleteDisclosure = useDisclosure<any>()
+  const rejectDisclosure = useDisclosure<any>()
+  const [rejectReason, setRejectReason] = useState("")
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_DRIVER_FILTERS)
 
@@ -34,6 +45,31 @@ export const DriversPage = () => {
         search: filter.search || undefined,
         status: filter.status || undefined,
       })
+    },
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: (id: string) => driverService.verifyDriver(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.drivers.all })
+      toast.success("Driver verified and activated successfully!")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to verify driver")
+    },
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      driverService.rejectDriver(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.drivers.all })
+      rejectDisclosure.onClose()
+      setRejectReason("")
+      toast.success("Driver application rejected")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to reject driver")
     },
   })
 
@@ -121,13 +157,47 @@ export const DriversPage = () => {
       },
       {
         header: "Status",
-        cell: (row) => <StatusBadge status={row.status} />,
+        cell: (row) => <StatusBadge status={row.status || "PENDING"} />,
+      },
+      {
+        header: "Verification",
+        cell: (row) => (
+          <StatusBadge status={row.verificationStatus || "PENDING"} />
+        ),
       },
       {
         header: "Actions",
         className: "text-right",
         cell: (row) => (
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center justify-end gap-1.5">
+            {row.verificationStatus !== "VERIFIED" ? (
+              <>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1 bg-emerald-600 px-2.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700"
+                  onClick={() => verifyMutation.mutate(row.id)}
+                  disabled={verifyMutation.isPending}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Verify
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 border-rose-200 px-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                  onClick={() => rejectDisclosure.onOpen(row)}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Reject
+                </Button>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Verified
+              </span>
+            )}
+
             <Button
               size="sm"
               variant="ghost"
@@ -158,7 +228,7 @@ export const DriversPage = () => {
         ),
       },
     ]
-  }, [deleteDisclosure])
+  }, [deleteDisclosure, rejectDisclosure, verifyMutation])
 
   return (
     <div className="space-y-6">
@@ -166,6 +236,23 @@ export const DriversPage = () => {
         open={drawerDisclosure.isOpen}
         onClose={drawerDisclosure.onClose}
         driver={drawerDisclosure.data}
+      />
+
+      {/* Reject Dialog */}
+      <ConfirmDialog
+        open={rejectDisclosure.isOpen}
+        onOpenChange={rejectDisclosure.onClose}
+        title="Reject Driver Application"
+        description={`Reject registration for driver "${rejectDisclosure.data?.name}" (${rejectDisclosure.data?.licenseNumber})?`}
+        onConfirm={() =>
+          rejectMutation.mutate({
+            id: rejectDisclosure.data?.id || "",
+            reason: rejectReason || "Documents could not be verified",
+          })
+        }
+        isLoading={rejectMutation.isPending}
+        confirmText="Reject Application"
+        variant="danger"
       />
 
       {/* Delete Dialog */}
@@ -213,7 +300,7 @@ export const DriversPage = () => {
                 { label: "Off Duty", value: "OFF_DUTY" },
                 { label: "Suspended", value: "SUSPENDED" },
               ]}
-              className="w-[180px]"
+              className="w-45"
             />
           </FilterBar>
 

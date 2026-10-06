@@ -4,19 +4,26 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { TechnicianProfile } from './entities/technician-profile.entity';
 import { UpdateTechnicianProfileDto } from './dto/update-technician-profile.dto';
 import { QueryTechniciansDto } from './dto/query-technicians.dto';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { AvailabilityStatus } from '../../common/enums/availability-status.enum';
 import { VerificationStatus } from '../../common/enums/verification-status.enum';
+import { Role } from '../users/entities/role.entity';
+import { UserRole } from '../users/entities/user-role.entity';
+import { ProfessionalApplication } from '../applications/entities/professional-application.entity';
+import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role.enum';
+import { ApplicationStatus } from '../../common/enums/application-status.enum';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
 
 @Injectable()
 export class TechniciansService {
   constructor(
     @InjectRepository(TechnicianProfile)
     private readonly techRepo: Repository<TechnicianProfile>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findByUserId(userId: string): Promise<TechnicianProfile> {
@@ -105,5 +112,93 @@ export class TechniciansService {
         totalPages: Math.ceil(total / (query.limit || 10)),
       },
     };
+  }
+
+  async verifyTechnician(id: string, adminId: string, notes?: string): Promise<TechnicianProfile> {
+    const tech = await this.techRepo.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+    if (!tech) {
+      throw new NotFoundException(`Technician profile not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      tech.verificationStatus = VerificationStatus.VERIFIED;
+      const savedTech = await manager.save(tech);
+
+      // Assign TECHNICIAN role to user
+      const role = await manager.findOne(Role, { where: { name: BusinessRole.TECHNICIAN } });
+      if (role) {
+        let userRole = await manager.findOne(UserRole, {
+          where: { userId: tech.userId, roleId: role.id },
+        });
+        if (userRole) {
+          userRole.status = RoleAssignmentStatus.APPROVED;
+          userRole.approvedAt = new Date();
+          userRole.approvedBy = adminId;
+          await manager.save(userRole);
+        } else {
+          await manager.save(
+            manager.create(UserRole, {
+              userId: tech.userId,
+              roleId: role.id,
+              status: RoleAssignmentStatus.APPROVED,
+              approvedAt: new Date(),
+              approvedBy: adminId,
+            }),
+          );
+        }
+      }
+
+      // Update any pending applications
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: tech.userId,
+          requestedRole: ProfessionalRole.TECHNICIAN,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          notes: notes || 'Verified by admin',
+        },
+      );
+
+      return savedTech;
+    });
+  }
+
+  async rejectTechnician(id: string, adminId: string, rejectionReason?: string): Promise<TechnicianProfile> {
+    const tech = await this.techRepo.findOne({
+      where: { id },
+    });
+    if (!tech) {
+      throw new NotFoundException(`Technician profile not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      tech.verificationStatus = VerificationStatus.REJECTED;
+      const savedTech = await manager.save(tech);
+
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: tech.userId,
+          requestedRole: ProfessionalRole.TECHNICIAN,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.REJECTED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          rejectionReason: rejectionReason || 'Rejected by platform admin',
+        },
+      );
+
+      return savedTech;
+    });
   }
 }

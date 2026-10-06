@@ -26,12 +26,15 @@ import { AssignVehicleDto } from './dto/assign-vehicle.dto';
 import { UpdateDriverAvailabilityDto } from './dto/update-driver-availability.dto';
 import { QueryDriversDto } from './dto/query-drivers.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { BusinessRole } from '../../common/enums/business-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentUserDto } from '../../common/interfaces/current-user.interface';
 
 @ApiTags('Drivers & Fleet Management')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('drivers')
 export class DriversController {
   constructor(private readonly driversService: DriversService) {}
@@ -126,5 +129,31 @@ export class DriversController {
   @ApiResponse({ status: 200, description: 'Paginated drivers list' })
   async findAll(@Query() query: QueryDriversDto) {
     return this.driversService.findAll(query);
+  }
+
+  @Patch(':id/verify')
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Verify driver profile and assign DRIVER role (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Driver Profile UUID' })
+  @ApiResponse({ status: 200, description: 'Verified driver record' })
+  async verifyDriver(
+    @Param('id') id: string,
+    @Body() dto: { notes?: string },
+    @CurrentUser() admin: CurrentUserDto,
+  ) {
+    return this.driversService.verifyDriver(id, admin.userId, dto?.notes);
+  }
+
+  @Patch(':id/reject')
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Reject driver profile (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Driver Profile UUID' })
+  @ApiResponse({ status: 200, description: 'Rejected driver record' })
+  async rejectDriver(
+    @Param('id') id: string,
+    @Body() dto: { rejectionReason?: string },
+    @CurrentUser() admin: CurrentUserDto,
+  ) {
+    return this.driversService.rejectDriver(id, admin.userId, dto?.rejectionReason);
   }
 }

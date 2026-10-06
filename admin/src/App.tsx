@@ -17,6 +17,8 @@ import { BookingsPage } from "./pages/bookings/BookingsPage"
 import { UsersPage } from "./pages/users/UsersPage"
 import { VouchersPage } from "./pages/vouchers/VouchersPage"
 import { DriversPage } from "./pages/drivers/DriversPage"
+import { MechanicsPage } from "./pages/mechanics/MechanicsPage"
+import { ParkingPage } from "./pages/parking/ParkingPage"
 import { SeatsPage } from "./pages/seats/SeatsPage"
 import { ReportsPage } from "./pages/reports/ReportsPage"
 import { RolesPermissionsPage } from "./pages/roles/RolesPermissionsPage"
@@ -50,6 +52,8 @@ export function App() {
             <Route path={ROUTES.USERS} element={<UsersPage />} />
             <Route path={ROUTES.VOUCHERS} element={<VouchersPage />} />
             <Route path={ROUTES.DRIVERS} element={<DriversPage />} />
+            <Route path={ROUTES.MECHANICS} element={<MechanicsPage />} />
+            <Route path={ROUTES.PARKING} element={<ParkingPage />} />
             <Route path={ROUTES.SEATS} element={<SeatsPage />} />
             <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
             <Route path={ROUTES.ROLES} element={<RolesPermissionsPage />} />

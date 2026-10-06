@@ -15,6 +15,8 @@ export const ROUTES = {
   USERS: "/users",
   VOUCHERS: "/vouchers",
   DRIVERS: "/drivers",
+  MECHANICS: "/mechanics",
+  PARKING: "/parking",
   SEATS: "/seats",
   REPORTS: "/reports",
   ROLES: "/roles",
@@ -46,26 +48,11 @@ export const SIDEBAR_NAVIGATION: NavSection[] = [
         iconName: "LayoutDashboard",
         resourcePermission: "dashboard:read",
       },
-      // {
-      //   id: 'reports',
-      //   title: 'Analytics & Revenue',
-      //   path: ROUTES.REPORTS,
-      //   iconName: 'BarChart3',
-      //   badge: 'Live',
-      //   resourcePermission: 'analytics:read',
-      // },
     ],
   },
   {
     sectionTitle: "Fleet & Logistics",
     items: [
-      // {
-      //   id: "operators",
-      //   title: "Bus Operators",
-      //   path: ROUTES.OPERATORS,
-      //   iconName: "Building2",
-      //   resourcePermission: "operators:read",
-      // },
       {
         id: "Cab Types",
         title: "Cabs and Types",
@@ -80,13 +67,20 @@ export const SIDEBAR_NAVIGATION: NavSection[] = [
         iconName: "UserCheck",
         resourcePermission: "drivers:read",
       },
-      // {
-      //   id: "seats",
-      //   title: "Seat Templates",
-      //   path: ROUTES.SEATS,
-      //   iconName: "Grid",
-      //   resourcePermission: "seats:read",
-      // },
+      {
+        id: "mechanics",
+        title: "Mechanics / Technicians",
+        path: ROUTES.MECHANICS,
+        iconName: "Wrench",
+        resourcePermission: "drivers:read",
+      },
+      {
+        id: "parking",
+        title: "Parking Facilities",
+        path: ROUTES.PARKING,
+        iconName: "SquareParking",
+        resourcePermission: "operators:read",
+      },
     ],
   },
   // {

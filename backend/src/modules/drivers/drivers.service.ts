@@ -18,6 +18,12 @@ import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { AvailabilityStatus } from '../../common/enums/availability-status.enum';
 import { VerificationStatus } from '../../common/enums/verification-status.enum';
 import { DriverVehicleAssignmentStatus, VehicleStatus } from '../../common/enums/vehicle-status.enum';
+import { Role } from '../users/entities/role.entity';
+import { UserRole } from '../users/entities/user-role.entity';
+import { ProfessionalApplication } from '../applications/entities/professional-application.entity';
+import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role.enum';
+import { ApplicationStatus } from '../../common/enums/application-status.enum';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
 
 @Injectable()
 export class DriversService {
@@ -289,16 +295,8 @@ export class DriversService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    // Mask license numbers for non-admin listing
-    const masked = data.map((d) => {
-      if (d.licenseNumber && d.licenseNumber.length > 4) {
-        d.licenseNumber = `***${d.licenseNumber.slice(-4)}`;
-      }
-      return d;
-    });
-
     return {
-      data: masked,
+      data,
       meta: {
         total,
         page: query.page || 1,
@@ -306,5 +304,93 @@ export class DriversService {
         totalPages: Math.ceil(total / (query.limit || 10)),
       },
     };
+  }
+
+  async verifyDriver(id: string, adminId: string, notes?: string): Promise<DriverProfile> {
+    const driver = await this.driverRepo.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+    if (!driver) {
+      throw new NotFoundException(`Driver profile not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      driver.verificationStatus = VerificationStatus.VERIFIED;
+      const savedDriver = await manager.save(driver);
+
+      // Assign DRIVER role to user
+      const role = await manager.findOne(Role, { where: { name: BusinessRole.DRIVER } });
+      if (role) {
+        let userRole = await manager.findOne(UserRole, {
+          where: { userId: driver.userId, roleId: role.id },
+        });
+        if (userRole) {
+          userRole.status = RoleAssignmentStatus.APPROVED;
+          userRole.approvedAt = new Date();
+          userRole.approvedBy = adminId;
+          await manager.save(userRole);
+        } else {
+          await manager.save(
+            manager.create(UserRole, {
+              userId: driver.userId,
+              roleId: role.id,
+              status: RoleAssignmentStatus.APPROVED,
+              approvedAt: new Date(),
+              approvedBy: adminId,
+            }),
+          );
+        }
+      }
+
+      // Update any pending applications
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: driver.userId,
+          requestedRole: ProfessionalRole.DRIVER,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          notes: notes || 'Verified by admin',
+        },
+      );
+
+      return savedDriver;
+    });
+  }
+
+  async rejectDriver(id: string, adminId: string, rejectionReason?: string): Promise<DriverProfile> {
+    const driver = await this.driverRepo.findOne({
+      where: { id },
+    });
+    if (!driver) {
+      throw new NotFoundException(`Driver profile not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      driver.verificationStatus = VerificationStatus.REJECTED;
+      const savedDriver = await manager.save(driver);
+
+      await manager.update(
+        ProfessionalApplication,
+        {
+          userId: driver.userId,
+          requestedRole: ProfessionalRole.DRIVER,
+          status: ApplicationStatus.PENDING,
+        },
+        {
+          status: ApplicationStatus.REJECTED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+          rejectionReason: rejectionReason || 'Rejected by platform admin',
+        },
+      );
+
+      return savedDriver;
+    });
   }
 }

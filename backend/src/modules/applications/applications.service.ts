@@ -47,23 +47,17 @@ export class ApplicationsService {
     private readonly dataSource: DataSource,
   ) {}
 
-  private async ensureNoActiveApplication(userId: string, role: ProfessionalRole) {
-    const existing = await this.appRepo.findOne({
+  private async findActiveApplication(userId: string, role: ProfessionalRole) {
+    return this.appRepo.findOne({
       where: [
         { userId, requestedRole: role, status: ApplicationStatus.PENDING },
         { userId, requestedRole: role, status: ApplicationStatus.UNDER_REVIEW },
       ],
     });
-
-    if (existing) {
-      throw new ConflictException(
-        `You already have an active application (${existing.status}) for role ${role}. Please await administrative review.`,
-      );
-    }
   }
 
   async applyTechnician(userId: string, dto: ApplyTechnicianDto): Promise<ProfessionalApplication> {
-    await this.ensureNoActiveApplication(userId, ProfessionalRole.TECHNICIAN);
+    const existing = await this.findActiveApplication(userId, ProfessionalRole.TECHNICIAN);
 
     return this.dataSource.transaction(async (manager) => {
       // 1. Create or update TechnicianProfile with PENDING verification
@@ -114,7 +108,13 @@ export class ApplicationsService {
       }
       await manager.save(techProfile);
 
-      // 2. Create application record
+      // 2. Create or update application record
+      if (existing) {
+        existing.status = ApplicationStatus.PENDING;
+        existing.submittedAt = new Date();
+        return manager.save(existing);
+      }
+
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.TECHNICIAN,
@@ -126,7 +126,7 @@ export class ApplicationsService {
   }
 
   async applyDriver(userId: string, dto: ApplyDriverDto): Promise<ProfessionalApplication> {
-    await this.ensureNoActiveApplication(userId, ProfessionalRole.DRIVER);
+    const existing = await this.findActiveApplication(userId, ProfessionalRole.DRIVER);
 
     return this.dataSource.transaction(async (manager) => {
       // 1. Create or update DriverProfile
@@ -201,7 +201,13 @@ export class ApplicationsService {
         }
       }
 
-      // 3. Create application record
+      // 3. Create or update application record
+      if (existing) {
+        existing.status = ApplicationStatus.PENDING;
+        existing.submittedAt = new Date();
+        return manager.save(existing);
+      }
+
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.DRIVER,
@@ -213,7 +219,7 @@ export class ApplicationsService {
   }
 
   async applyParking(userId: string, dto: ApplyParkingDto): Promise<ProfessionalApplication> {
-    await this.ensureNoActiveApplication(userId, ProfessionalRole.PARKING_OPERATOR);
+    const existing = await this.findActiveApplication(userId, ProfessionalRole.PARKING_OPERATOR);
 
     return this.dataSource.transaction(async (manager) => {
       // 1. Create or update ParkingOperator profile
@@ -286,7 +292,13 @@ export class ApplicationsService {
       });
       await manager.save(location);
 
-      // 3. Create application record
+      // 3. Create or update application record
+      if (existing) {
+        existing.status = ApplicationStatus.PENDING;
+        existing.submittedAt = new Date();
+        return manager.save(existing);
+      }
+
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.PARKING_OPERATOR,
@@ -297,7 +309,7 @@ export class ApplicationsService {
     });
   }
 
-  async findAll(query: QueryApplicationsDto): Promise<PaginatedResult<ProfessionalApplication>> {
+  async findAll(query: QueryApplicationsDto): Promise<PaginatedResult<any>> {
     const qb = this.appRepo
       .createQueryBuilder('app')
       .leftJoinAndSelect('app.user', 'user');
@@ -322,8 +334,34 @@ export class ApplicationsService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    // Enrich with profile information
+    const enriched = await Promise.all(
+      data.map(async (app) => {
+        let profileDetails: any = null;
+        if (app.requestedRole === ProfessionalRole.DRIVER) {
+          profileDetails = await this.driverProfileRepo.findOne({
+            where: { userId: app.userId },
+            relations: { driverVehicles: { vehicle: true } },
+          });
+        } else if (app.requestedRole === ProfessionalRole.TECHNICIAN) {
+          profileDetails = await this.techProfileRepo.findOne({
+            where: { userId: app.userId },
+          });
+        } else if (app.requestedRole === ProfessionalRole.PARKING_OPERATOR) {
+          profileDetails = await this.parkingOpRepo.findOne({
+            where: { userId: app.userId },
+            relations: { locations: true },
+          });
+        }
+        return {
+          ...app,
+          profileDetails,
+        };
+      }),
+    );
+
     return {
-      data,
+      data: enriched,
       meta: {
         total,
         page: query.page || 1,
@@ -340,7 +378,7 @@ export class ApplicationsService {
     });
   }
 
-  async findById(id: string): Promise<ProfessionalApplication> {
+  async findById(id: string): Promise<any> {
     const app = await this.appRepo.findOne({
       where: { id },
       relations: {
@@ -350,7 +388,28 @@ export class ApplicationsService {
     if (!app) {
       throw new NotFoundException(`Application with ID ${id} not found`);
     }
-    return app;
+
+    let profileDetails: any = null;
+    if (app.requestedRole === ProfessionalRole.DRIVER) {
+      profileDetails = await this.driverProfileRepo.findOne({
+        where: { userId: app.userId },
+        relations: { driverVehicles: { vehicle: true } },
+      });
+    } else if (app.requestedRole === ProfessionalRole.TECHNICIAN) {
+      profileDetails = await this.techProfileRepo.findOne({
+        where: { userId: app.userId },
+      });
+    } else if (app.requestedRole === ProfessionalRole.PARKING_OPERATOR) {
+      profileDetails = await this.parkingOpRepo.findOne({
+        where: { userId: app.userId },
+        relations: { locations: true },
+      });
+    }
+
+    return {
+      ...app,
+      profileDetails,
+    };
   }
 
   async review(id: string, dto: ReviewApplicationDto, adminId: string): Promise<ProfessionalApplication> {

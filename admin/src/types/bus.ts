@@ -27,19 +27,24 @@ export interface Driver {
     email: string;
     phone?: string;
   };
-  operatorId: string;
+  operatorId?: string;
   operator?: BusOperator;
-  name: string;
-  phone: string;
+  name?: string;
+  phone?: string;
   licenseNumber: string;
+  licenseType?: string;
   experienceYears?: number;
   rating?: number;
-  status: 'ACTIVE' | 'ON_TRIP' | 'OFF_DUTY' | 'SUSPENDED';
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  availabilityStatus?: 'AVAILABLE' | 'ON_TRIP' | 'OFFLINE';
+  status?: 'ACTIVE' | 'ON_TRIP' | 'OFF_DUTY' | 'SUSPENDED' | 'PENDING' | string;
+  driverVehicles?: any[];
   createdAt?: string;
   updatedAt?: string;
 
   // Computed / UI compatibility fields
   operatorName?: string;
+  viewMode?: boolean;
 }
 
 export type BusTypeEnum = 'SLEEPER' | 'SEATER' | 'SEMI_SLEEPER' | 'HYBRID';
