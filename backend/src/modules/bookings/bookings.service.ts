@@ -743,12 +743,13 @@ export class BookingsService {
             driverId: driver.id,
             driverName: driver.user?.name || 'Partner Driver',
             driverPhone: driver.user?.phone,
-            cabPlateNumber: booking.cabPlateNumber || assignedVehicle?.registrationNumber || 'BR 01 EA 4521',
+            cabPlateNumber: booking.cabPlateNumber || assignedVehicle?.registrationNumber || '',
             cabName: booking.cabName || 'Cab',
             driverRating: Number(booking.driverRating) || 4.9,
           },
           booking.serviceType,
           booking.userId,
+          booking.bookingNumber,
         );
       }
 
@@ -927,14 +928,18 @@ export class BookingsService {
     userId?: string,
     isAdmin = false,
   ): Promise<Booking> {
+    const cleanId = id.trim();
+    const withHash = cleanId.startsWith('#') ? cleanId : `#${cleanId}`;
+    const withoutHash = cleanId.replace(/^#/, '');
+
     const qb = this.bookingRepo
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.vehicle', 'vehicle')
       .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
       .where(
-        '(booking.id = :id OR booking.booking_number = :id)',
-        { id },
+        '(booking.id = :cleanId OR booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
+        { cleanId, withHash, withoutHash },
       );
 
     if (!isAdmin && userId) {

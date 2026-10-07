@@ -207,9 +207,15 @@ export class DispatchGateway
     @MessageBody() data: { bookingId: string },
   ) {
     if (data?.bookingId) {
-      const room = `booking_${data.bookingId}`;
+      const cleanId = data.bookingId.trim();
+      const room = `booking_${cleanId}`;
       client.join(room);
-      this.logger.log(`Socket ${client.id} joined room ${room}`);
+      if (cleanId.startsWith('#')) {
+        client.join(`booking_${cleanId.replace(/^#/, '')}`);
+      } else {
+        client.join(`booking_#${cleanId}`);
+      }
+      this.logger.log(`Socket ${client.id} joined rooms for booking ${cleanId}`);
       return { success: true, room };
     }
     return { success: false, message: 'bookingId is required' };
@@ -232,12 +238,14 @@ export class DispatchGateway
     },
     serviceType = 'CAB',
     passengerUserId?: string,
+    bookingNumber?: string,
   ) {
     const categoryUpper = serviceType.toUpperCase();
 
     // 1. Tell all other drivers/technicians that this booking is taken -> IMMEDIATELY CLOSE POPUP
     this.server.to(`service_${categoryUpper}`).emit('booking_taken', {
       bookingId,
+      bookingNumber,
       status: 'TAKEN',
       takenBy: acceptedDriver.driverName,
       message: 'This ride has already been accepted by another driver.',
@@ -247,6 +255,7 @@ export class DispatchGateway
     if (categoryUpper === 'CAB') {
       this.server.to('drivers').emit('booking_taken', {
         bookingId,
+        bookingNumber,
         status: 'TAKEN',
         takenBy: acceptedDriver.driverName,
       });
@@ -255,6 +264,7 @@ export class DispatchGateway
     // 3. Prepare full payload with both nested driver object and flattened fields
     const payload = {
       bookingId,
+      bookingNumber: bookingNumber || '',
       status: 'ACCEPTED',
       driver: acceptedDriver,
       driverId: acceptedDriver.driverId,
@@ -267,6 +277,11 @@ export class DispatchGateway
 
     // Emit to specific booking room (passenger joined on assignment card)
     this.server.to(`booking_${bookingId}`).emit('booking_assigned', payload);
+    if (bookingNumber) {
+      const cleanNum = bookingNumber.trim();
+      this.server.to(`booking_${cleanNum}`).emit('booking_assigned', payload);
+      this.server.to(`booking_${cleanNum.replace(/^#/, '')}`).emit('booking_assigned', payload);
+    }
 
     // Emit to user room (passenger private room)
     if (passengerUserId) {
@@ -277,7 +292,7 @@ export class DispatchGateway
     this.server.emit('booking_assigned', payload);
 
     this.logger.log(
-      `Broadcasted booking_assigned & booking_taken for booking ${bookingId} (accepted by ${acceptedDriver.driverName})`,
+      `Broadcasted booking_assigned & booking_taken for booking ${bookingId} / ${bookingNumber} (accepted by ${acceptedDriver.driverName})`,
     );
   }
 
