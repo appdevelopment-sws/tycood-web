@@ -12,6 +12,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { TaxesModule } from './modules/taxes/taxes.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { LocationModule } from './modules/location/location.module.js';
+import { DispatchModule } from './modules/dispatch/dispatch.module.js';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -33,6 +34,7 @@ import { AppService } from './app.service';
     TaxesModule,
     SettingsModule,
     LocationModule,
+    DispatchModule,
   ],
   controllers: [AppController],
   providers: [AppService],

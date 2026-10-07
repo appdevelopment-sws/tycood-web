@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Logger,
   Optional,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import { TaxType } from '../taxes/enums/tax-type.enum.js';
 import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
 import { SystemSetting } from '../settings/entities/system-setting.entity.js';
 import { LocationService } from '../location/location.service.js';
+import { DispatchGateway } from '../dispatch/dispatch.gateway.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
 import { QueryBookingsDto } from './dto/query-bookings.dto.js';
 import { AvailableCabsQueryDto } from './dto/available-cabs-query.dto.js';
@@ -48,6 +50,8 @@ export class BookingsService {
     private readonly dataSource: DataSource,
     @Optional()
     private readonly locationService?: LocationService,
+    @Optional()
+    private readonly dispatchGateway?: DispatchGateway,
   ) {}
 
   /**
@@ -511,14 +515,22 @@ export class BookingsService {
       const passengerPhone =
         dto.passengerPhone?.trim() || user.phone || '+91 98765 43210';
 
+      const initialStatus = driverProfileId
+        ? BookingStatus.ACTIVE
+        : BookingStatus.PENDING;
+
       const booking = queryRunner.manager.create(Booking, {
         bookingNumber,
         userId: user.id,
         serviceType: dto.serviceType || BookingServiceType.CAB,
-        status: BookingStatus.ACTIVE,
+        status: initialStatus,
         tripType: dto.tripType || BookingTripType.ONE_WAY,
         pickupLocation: dto.pickupLocation,
+        pickupLat: dto.pickupLat ? Number(dto.pickupLat) : null,
+        pickupLng: dto.pickupLng ? Number(dto.pickupLng) : null,
         dropLocation: dto.dropLocation,
+        dropLat: dto.dropLat ? Number(dto.dropLat) : null,
+        dropLng: dto.dropLng ? Number(dto.dropLng) : null,
         intermediateStop: dto.intermediateStop || null,
         scheduledDateTime: new Date(dto.scheduledDateTime),
         returnDateTime: dto.returnDateTime ? new Date(dto.returnDateTime) : null,
@@ -566,8 +578,21 @@ export class BookingsService {
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Created booking ${savedBooking.bookingNumber} for user ${user.id} (${passengerName})`,
+        `Created booking ${savedBooking.bookingNumber} for user ${user.id} (${passengerName}, status: ${initialStatus})`,
       );
+
+      // Trigger real-time socket dispatch broadcast to drivers within 20km
+      if (this.dispatchGateway) {
+        this.dispatchGateway
+          .broadcastNewBookingRequest(
+            savedBooking,
+            dto.pickupLat ? Number(dto.pickupLat) : null,
+            dto.pickupLng ? Number(dto.pickupLng) : null,
+          )
+          .catch((err) =>
+            this.logger.warn(`Failed to broadcast new booking request: ${err}`),
+          );
+      }
 
       return savedBooking;
     } catch (err) {
@@ -577,6 +602,165 @@ export class BookingsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Driver or technician accepts an incoming dispatch request.
+   * Atomically assigns the driver and broadcasts 'booking_taken' to remove the popup from all other drivers.
+   */
+  async acceptBooking(bookingId: string, driverUserId: string): Promise<Booking> {
+    const driver = await this.driverRepo.findOne({
+      where: { userId: driverUserId },
+      relations: {
+        user: true,
+        driverVehicles: {
+          vehicle: true,
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new BadRequestException(
+        'Authenticated user does not have a registered driver profile',
+      );
+    }
+
+    const assignedVehicle = driver.driverVehicles?.[0]?.vehicle;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const booking = await queryRunner.manager.findOne(Booking, {
+        where: { id: bookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!booking) {
+        throw new NotFoundException(`Booking with ID ${bookingId} not found`);
+      }
+
+      if (booking.driverProfileId && booking.driverProfileId !== driver.id) {
+        throw new ConflictException(
+          'This booking has already been accepted by another driver.',
+        );
+      }
+
+      if (booking.status === BookingStatus.CANCELLED) {
+        throw new BadRequestException('This booking was cancelled by the passenger.');
+      }
+
+      if (booking.status === BookingStatus.COMPLETED) {
+        throw new BadRequestException('This booking is already completed.');
+      }
+
+      // Assign driver and vehicle
+      booking.driverProfileId = driver.id;
+      if (assignedVehicle) {
+        booking.vehicleId = assignedVehicle.id;
+        booking.cabPlateNumber = assignedVehicle.registrationNumber;
+        booking.cabName = `${assignedVehicle.make} ${assignedVehicle.model}`;
+        booking.cabCategory = assignedVehicle.vehicleCategory;
+      }
+      booking.driverName = driver.user?.name || 'Partner Driver';
+      booking.driverPhone = driver.user?.phone || null;
+      booking.status = BookingStatus.ACTIVE;
+      booking.updatedAt = new Date();
+
+      const saved = await queryRunner.manager.save(Booking, booking);
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Booking ${booking.bookingNumber} was accepted by driver ${driver.user?.name} (${driver.id})`,
+      );
+
+      // Broadcast 'booking_taken' to all other drivers so their popup immediately disappears,
+      // and 'booking_assigned' to the passenger!
+      if (this.dispatchGateway) {
+        this.dispatchGateway.broadcastBookingAccepted(
+          booking.id,
+          {
+            driverId: driver.id,
+            driverName: driver.user?.name || 'Partner Driver',
+            driverPhone: driver.user?.phone,
+            cabPlateNumber: booking.cabPlateNumber || assignedVehicle?.registrationNumber,
+            cabName: booking.cabName || 'Cab',
+            driverRating: Number(booking.driverRating) || 4.9,
+          },
+          booking.serviceType,
+          booking.userId,
+        );
+      }
+
+      return saved;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Fetch currently pending / unassigned booking requests within radius
+   */
+  async getPendingDispatches(query: {
+    serviceType?: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+  }): Promise<Booking[]> {
+    const qb = this.bookingRepo
+      .createQueryBuilder('booking')
+      .where('booking.status = :status', { status: BookingStatus.PENDING })
+      .andWhere('booking.driver_profile_id IS NULL');
+
+    if (query.serviceType) {
+      qb.andWhere('booking.service_type = :serviceType', {
+        serviceType: query.serviceType,
+      });
+    }
+
+    qb.orderBy('booking.created_at', 'DESC');
+    qb.take(20);
+
+    const bookings = await qb.getMany();
+
+    if (query.lat !== undefined && query.lng !== undefined && bookings.length > 0) {
+      const radius = query.radiusKm || 20;
+      return bookings.filter((b) => {
+        if (!b.pickupLat || !b.pickupLng) return true; // keep if coordinates unknown
+        const dist = this.calculateHaversineDistanceKm(
+          Number(query.lat),
+          Number(query.lng),
+          Number(b.pickupLat),
+          Number(b.pickupLng),
+        );
+        return dist <= radius;
+      });
+    }
+
+    return bookings;
+  }
+
+  private calculateHaversineDistanceKm(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
   }
 
   /**

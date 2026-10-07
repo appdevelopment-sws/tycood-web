@@ -4,9 +4,10 @@ import { LocationCacheService } from './location-cache.service.js';
 import { LocationController } from './location.controller.js';
 
 import { SettingsModule } from '../settings/settings.module.js';
+import { DispatchModule } from '../dispatch/dispatch.module.js';
 
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule, DispatchModule],
   controllers: [LocationController],
   providers: [LocationCacheService, LocationService],
   exports: [LocationService, LocationCacheService],

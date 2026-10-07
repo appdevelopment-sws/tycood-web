@@ -103,6 +103,40 @@ export class TechnicianProfile {
   })
   availabilityStatus: AvailabilityStatus;
 
+  @Index()
+  @Column({
+    name: 'current_lat',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value ? parseFloat(value) : null),
+    },
+  })
+  currentLat: number | null;
+
+  @Index()
+  @Column({
+    name: 'current_lng',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value ? parseFloat(value) : null),
+    },
+  })
+  currentLng: number | null;
+
+  @Column({ name: 'current_address', type: 'text', nullable: true })
+  currentAddress: string | null;
+
+  @Column({ name: 'last_location_updated_at', type: 'timestamptz', nullable: true })
+  lastLocationUpdatedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -64,8 +64,48 @@ export class Booking {
   @Column({ name: 'pickup_location', type: 'text' })
   pickupLocation: string;
 
+  @Column({
+    name: 'pickup_lat',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  pickupLat: number | null;
+
+  @Column({
+    name: 'pickup_lng',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  pickupLng: number | null;
+
   @Column({ name: 'drop_location', type: 'text', nullable: true })
   dropLocation: string;
+
+  @Column({
+    name: 'drop_lat',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  dropLat: number | null;
+
+  @Column({
+    name: 'drop_lng',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  dropLng: number | null;
 
   @Column({ name: 'intermediate_stop', type: 'text', nullable: true })
   intermediateStop: string | null;

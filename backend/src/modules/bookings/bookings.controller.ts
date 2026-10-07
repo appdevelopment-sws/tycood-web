@@ -172,4 +172,46 @@ export class BookingsController {
   ) {
     return this.bookingsService.updateStatus(id, dto);
   }
+
+  @Post(':id/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Driver accepts a booking request',
+    description:
+      'Atomically claims an unassigned booking, sets status to ACTIVE, and broadcasts booking_taken via WebSocket to dismiss all other popups immediately.',
+  })
+  @ApiParam({ name: 'id', description: 'Booking UUID' })
+  @ApiResponse({ status: 200, description: 'Booking successfully accepted and assigned' })
+  @ApiResponse({ status: 409, description: 'Booking already taken by another driver' })
+  async acceptBooking(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserDto,
+  ) {
+    return this.bookingsService.acceptBooking(id, user.userId);
+  }
+
+  @Get('pending-dispatches')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get pending unassigned booking requests within operating radius',
+    description:
+      'Returns pending requests matching service category and within 20km radius',
+  })
+  @ApiResponse({ status: 200, description: 'List of unassigned pending bookings' })
+  async getPendingDispatches(
+    @Query('serviceType') serviceType?: string,
+    @Query('lat') lat?: number,
+    @Query('lng') lng?: number,
+    @Query('radiusKm') radiusKm?: number,
+  ) {
+    return this.bookingsService.getPendingDispatches({
+      serviceType,
+      lat: lat ? Number(lat) : undefined,
+      lng: lng ? Number(lng) : undefined,
+      radiusKm: radiusKm ? Number(radiusKm) : 20,
+    });
+  }
 }

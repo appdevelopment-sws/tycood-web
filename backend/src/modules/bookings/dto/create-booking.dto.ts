@@ -40,12 +40,44 @@ export class CreateBookingDto {
   pickupLocation: string;
 
   @ApiPropertyOptional({
+    example: 25.612676,
+    description: 'Pickup Latitude coordinate',
+  })
+  @IsOptional()
+  @IsNumber()
+  pickupLat?: number;
+
+  @ApiPropertyOptional({
+    example: 85.158875,
+    description: 'Pickup Longitude coordinate',
+  })
+  @IsOptional()
+  @IsNumber()
+  pickupLng?: number;
+
+  @ApiPropertyOptional({
     example: 'Danapur Railway Station, Patna',
     description: 'Destination / drop address',
   })
   @IsOptional()
   @IsString()
   dropLocation?: string;
+
+  @ApiPropertyOptional({
+    example: 25.594095,
+    description: 'Drop Latitude coordinate',
+  })
+  @IsOptional()
+  @IsNumber()
+  dropLat?: number;
+
+  @ApiPropertyOptional({
+    example: 85.045055,
+    description: 'Drop Longitude coordinate',
+  })
+  @IsOptional()
+  @IsNumber()
+  dropLng?: number;
 
   @ApiPropertyOptional({
     example: 'Bailey Road Crossing',

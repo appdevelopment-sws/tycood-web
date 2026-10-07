@@ -19,11 +19,49 @@ import { PlaceAutocompleteDto } from './dto/place-autocomplete.dto.js';
 import { PlaceDetailsDto } from './dto/place-details.dto.js';
 import { CalculateDistanceDto } from './dto/calculate-distance.dto.js';
 import { GetDirectionsDto } from './dto/get-directions.dto.js';
+import { UpdateCurrentLocationDto } from './dto/update-current-location.dto.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUserDto } from '../../common/interfaces/current-user.interface.js';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
+import { UseGuards, Req } from '@nestjs/common';
 
 @ApiTags('Location & Maps Services')
 @Controller('location')
 export class LocationController {
   constructor(private readonly locationService: LocationService) {}
+
+  @Post('current')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save and update live GPS location in DB for driver, technician, or user',
+    description: 'Stores currentLat, currentLng, and currentAddress in PostgreSQL DB and updates socket registry',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Current location recorded successfully',
+  })
+  async updateCurrentLocation(
+    @Body() dto: UpdateCurrentLocationDto,
+    @Req() req: any,
+  ) {
+    // Extract userId from JWT if present, or from body/header
+    const userId = req.user?.userId || req.body?.userId || req.headers['x-user-id'];
+    if (userId) {
+      return this.locationService.saveCurrentLocation(
+        userId,
+        dto.lat,
+        dto.lng,
+        dto.address,
+      );
+    }
+    return {
+      success: true,
+      lat: dto.lat,
+      lng: dto.lng,
+      address: dto.address,
+      message: 'Location received',
+    };
+  }
 
   @Get('reverse-geocode')
   @ApiOperation({

@@ -22,6 +22,8 @@ import { CalculateDistanceDto } from './dto/calculate-distance.dto.js';
 import { GetDirectionsDto } from './dto/get-directions.dto.js';
 import { LocationCacheService } from './location-cache.service.js';
 
+import { DispatchService } from '../dispatch/dispatch.service.js';
+
 @Injectable()
 export class LocationService {
   private readonly logger = new Logger(LocationService.name);
@@ -37,7 +39,31 @@ export class LocationService {
     private readonly cacheService: LocationCacheService,
     @Optional()
     private readonly settingsService?: SettingsService,
+    @Optional()
+    private readonly dispatchService?: DispatchService,
   ) {}
+
+  /**
+   * Save and persist live GPS location for user, driver, or technician
+   */
+  async saveCurrentLocation(
+    userId: string,
+    lat: number,
+    lng: number,
+    address?: string,
+  ) {
+    if (this.dispatchService) {
+      await this.dispatchService.persistLocation(userId, lat, lng, address);
+    }
+    return {
+      success: true,
+      userId,
+      lat,
+      lng,
+      address,
+      updatedAt: new Date(),
+    };
+  }
 
   /**
    * Helper to ensure API key is available.
