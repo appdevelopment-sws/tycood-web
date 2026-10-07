@@ -199,6 +199,23 @@ export class DispatchGateway
   }
 
   /**
+   * Client joins a specific booking room to receive updates (e.g., passenger waiting for assignment)
+   */
+  @SubscribeMessage('join_booking')
+  handleJoinBooking(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { bookingId: string },
+  ) {
+    if (data?.bookingId) {
+      const room = `booking_${data.bookingId}`;
+      client.join(room);
+      this.logger.log(`Socket ${client.id} joined room ${room}`);
+      return { success: true, room };
+    }
+    return { success: false, message: 'bookingId is required' };
+  }
+
+  /**
    * Broadcast that a booking was accepted.
    * - Emits 'booking_taken' to other drivers to IMMEDIATELY remove their popup.
    * - Emits 'booking_assigned' to the passenger.
@@ -235,17 +252,32 @@ export class DispatchGateway
       });
     }
 
-    // 3. Notify the passenger in their private user room
+    // 3. Prepare full payload with both nested driver object and flattened fields
+    const payload = {
+      bookingId,
+      status: 'ACCEPTED',
+      driver: acceptedDriver,
+      driverId: acceptedDriver.driverId,
+      driverName: acceptedDriver.driverName,
+      driverPhone: acceptedDriver.driverPhone || '',
+      cabPlateNumber: acceptedDriver.cabPlateNumber || '',
+      cabName: acceptedDriver.cabName || 'Cab',
+      driverRating: acceptedDriver.driverRating ?? 4.9,
+    };
+
+    // Emit to specific booking room (passenger joined on assignment card)
+    this.server.to(`booking_${bookingId}`).emit('booking_assigned', payload);
+
+    // Emit to user room (passenger private room)
     if (passengerUserId) {
-      this.server.to(`user_${passengerUserId}`).emit('booking_assigned', {
-        bookingId,
-        status: 'ACCEPTED',
-        driver: acceptedDriver,
-      });
+      this.server.to(`user_${passengerUserId}`).emit('booking_assigned', payload);
     }
 
+    // Also emit globally to ensure any active subscriber receives it
+    this.server.emit('booking_assigned', payload);
+
     this.logger.log(
-      `Broadcasted booking_taken for booking ${bookingId} (accepted by ${acceptedDriver.driverName})`,
+      `Broadcasted booking_assigned & booking_taken for booking ${bookingId} (accepted by ${acceptedDriver.driverName})`,
     );
   }
 
