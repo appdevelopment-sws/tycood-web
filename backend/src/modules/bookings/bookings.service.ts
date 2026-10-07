@@ -445,12 +445,12 @@ export class BookingsService {
       // 2. Generate 4-digit security OTP
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-      // 3. Resolve vehicle & driver details
+      // 3. Resolve vehicle & cab category details (Driver is assigned dynamically via dispatch)
       let vehicleId: string | null = null;
-      let driverProfileId: string | null = null;
-      let driverName: string | null = null;
-      let driverPhone: string | null = null;
-      let driverRating = 4.9;
+      const driverProfileId: string | null = null;
+      const driverName: string | null = null;
+      const driverPhone: string | null = null;
+      const driverRating = 4.9;
       let cabPlateNumber: string | null = dto.cabPlateNumber || null;
       let cabName = dto.cabName || 'Cab';
       let cabCategory = dto.cabCategory || 'Sedan';
@@ -458,28 +458,12 @@ export class BookingsService {
       if (dto.cabId) {
         const vehicle = await queryRunner.manager.findOne(Vehicle, {
           where: { id: dto.cabId },
-          relations: {
-            driverVehicles: {
-              driverProfile: {
-                user: true,
-              },
-            },
-          },
         });
         if (vehicle) {
           vehicleId = vehicle.id;
           cabPlateNumber = vehicle.registrationNumber;
           cabName = `${vehicle.make} ${vehicle.model}`;
           cabCategory = vehicle.vehicleCategory;
-          const assignedDriver = vehicle.driverVehicles?.[0]?.driverProfile;
-          if (assignedDriver) {
-            driverProfileId = assignedDriver.id;
-            driverRating = 4.9;
-            if (assignedDriver.user) {
-              driverName = assignedDriver.user.name;
-              driverPhone = assignedDriver.user.phone || null;
-            }
-          }
         }
       }
 
@@ -509,15 +493,13 @@ export class BookingsService {
           ? PaymentStatus.ADVANCE_PAID
           : PaymentStatus.COMPLETED;
 
-      // 5. Create booking entity
+      // 5. Create booking entity (Initial status is always PENDING until accepted by an online driver)
       const passengerName =
         dto.passengerName?.trim() || user.name || 'Rahul Kumar';
       const passengerPhone =
         dto.passengerPhone?.trim() || user.phone || '+91 98765 43210';
 
-      const initialStatus = driverProfileId
-        ? BookingStatus.ACTIVE
-        : BookingStatus.PENDING;
+      const initialStatus = BookingStatus.PENDING;
 
       const booking = queryRunner.manager.create(Booking, {
         bookingNumber,
