@@ -164,7 +164,7 @@ export class DispatchService {
         );
       }
     } catch (err) {
-      this.logger.error(`Error saving location for user ${userId}: ${err.message}`);
+      this.logger.error(`Error saving location for user ${userId}: ${(err as any)?.message}`);
     }
   }
 

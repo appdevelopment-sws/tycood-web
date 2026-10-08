@@ -583,7 +583,7 @@ export class BookingsService {
       return savedBooking;
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Failed to create booking: ${err.message}`, err.stack);
+      this.logger.error(`Failed to create booking: ${(err as any)?.message}`, (err as any)?.stack);
       throw err;
     } finally {
       await queryRunner.release();
@@ -881,7 +881,11 @@ export class BookingsService {
   ): Promise<PaginatedResult<Booking>> {
     const qb = this.bookingRepo
       .createQueryBuilder('booking')
-      .where('booking.user_id = :userId', { userId });
+      .leftJoinAndSelect('booking.user', 'user')
+      .leftJoinAndSelect('booking.vehicle', 'vehicle')
+      .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
+      .leftJoin('driver_profiles', 'dp', 'dp.id = booking.driver_profile_id')
+      .where('(booking.user_id = :userId OR dp.user_id = :userId)', { userId });
 
     if (queryDto.serviceType) {
       qb.andWhere('booking.service_type = :serviceType', {
@@ -903,10 +907,10 @@ export class BookingsService {
 
     qb.orderBy('booking.created_at', 'DESC');
     qb.skip(queryDto.skip);
-    qb.take(queryDto.limit || 10);
+    qb.take(queryDto.limit || 20);
 
     const [data, total] = await qb.getManyAndCount();
-    const limit = queryDto.limit || 10;
+    const limit = queryDto.limit || 20;
     const page = queryDto.page || 1;
 
     return {
@@ -992,7 +996,7 @@ export class BookingsService {
       return saved;
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Failed to cancel booking: ${err.message}`);
+      this.logger.error(`Failed to cancel booking: ${(err as any)?.message}`);
       throw err;
     } finally {
       await queryRunner.release();
@@ -1021,6 +1025,22 @@ export class BookingsService {
       booking.paymentStatus = PaymentStatus.COMPLETED;
       booking.remainingAmount = 0;
     }
-    return this.bookingRepo.save(booking);
+    const saved = await this.bookingRepo.save(booking);
+
+    if (this.dispatchGateway) {
+      this.dispatchGateway.broadcastBookingStatusUpdated(
+        saved.id,
+        saved.status,
+        saved.bookingNumber,
+        {
+          otp: saved.otp,
+          paymentStatus: saved.paymentStatus,
+          driverName: saved.driverName,
+          cabPlateNumber: saved.cabPlateNumber,
+        },
+      );
+    }
+
+    return saved;
   }
 }

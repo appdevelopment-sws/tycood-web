@@ -306,4 +306,30 @@ export class DispatchGateway
       status: 'CANCELLED',
     });
   }
+
+  /**
+   * Broadcast booking status update (e.g. ARRIVED, ACTIVE, COMPLETED)
+   */
+  broadcastBookingStatusUpdated(
+    bookingId: string,
+    status: string,
+    bookingNumber?: string,
+    extra?: Record<string, any>,
+  ) {
+    const payload = {
+      bookingId,
+      bookingNumber: bookingNumber || '',
+      status,
+      ...extra,
+    };
+    this.server.to(`booking_${bookingId}`).emit('booking_status_updated', payload);
+    if (bookingNumber) {
+      const cleanNum = bookingNumber.trim();
+      this.server.to(`booking_${cleanNum}`).emit('booking_status_updated', payload);
+      this.server
+        .to(`booking_${cleanNum.replace(/^#/, '')}`)
+        .emit('booking_status_updated', payload);
+    }
+    this.server.emit('booking_status_updated', payload);
+  }
 }
