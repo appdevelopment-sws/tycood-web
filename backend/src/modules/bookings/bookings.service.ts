@@ -1010,14 +1010,31 @@ export class BookingsService {
     id: string,
     dto: UpdateBookingStatusDto,
   ): Promise<Booking> {
-    const booking = await this.bookingRepo.findOne({ where: { id } });
+    const cleanId = id.trim();
+    const withHash = cleanId.startsWith('#') ? cleanId : `#${cleanId}`;
+    const withoutHash = cleanId.replace(/^#/, '');
+
+    const booking = await this.bookingRepo
+      .createQueryBuilder('booking')
+      .where(
+        '(booking.id = :cleanId OR booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
+        { cleanId, withHash, withoutHash },
+      )
+      .getOne();
+
     if (!booking) {
       throw new NotFoundException(`Booking with ID ${id} not found`);
     }
 
     // Verify OTP if starting or completing trip
-    if (dto.status === BookingStatus.ACTIVE && dto.otp && dto.otp !== booking.otp) {
+    if (dto.status === BookingStatus.ACTIVE && dto.otp && booking.otp && dto.otp.trim() !== booking.otp.trim()) {
       throw new BadRequestException('Invalid start ride OTP code');
+    }
+
+    if (dto.status === BookingStatus.COMPLETED && booking.otp) {
+      if (dto.otp && dto.otp.trim() !== booking.otp.trim()) {
+        throw new BadRequestException('Invalid completion OTP code');
+      }
     }
 
     booking.status = dto.status;
