@@ -935,16 +935,22 @@ export class BookingsService {
     const cleanId = id.trim();
     const withHash = cleanId.startsWith('#') ? cleanId : `#${cleanId}`;
     const withoutHash = cleanId.replace(/^#/, '');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleanId);
 
     const qb = this.bookingRepo
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.vehicle', 'vehicle')
-      .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
-      .where(
-        '(booking.id = :cleanId OR booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
+      .leftJoinAndSelect('booking.driverProfile', 'driverProfile');
+
+    if (isUuid) {
+      qb.where('booking.id = :cleanId', { cleanId });
+    } else {
+      qb.where(
+        '(booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
         { cleanId, withHash, withoutHash },
       );
+    }
 
     if (!isAdmin && userId) {
       qb.andWhere('booking.user_id = :userId', { userId });
@@ -1013,14 +1019,19 @@ export class BookingsService {
     const cleanId = id.trim();
     const withHash = cleanId.startsWith('#') ? cleanId : `#${cleanId}`;
     const withoutHash = cleanId.replace(/^#/, '');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleanId);
 
-    const booking = await this.bookingRepo
-      .createQueryBuilder('booking')
-      .where(
-        '(booking.id = :cleanId OR booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
+    const qb = this.bookingRepo.createQueryBuilder('booking');
+    if (isUuid) {
+      qb.where('booking.id = :cleanId', { cleanId });
+    } else {
+      qb.where(
+        '(booking.booking_number = :cleanId OR booking.booking_number = :withHash OR booking.booking_number = :withoutHash)',
         { cleanId, withHash, withoutHash },
-      )
-      .getOne();
+      );
+    }
+
+    const booking = await qb.getOne();
 
     if (!booking) {
       throw new NotFoundException(`Booking with ID ${id} not found`);
