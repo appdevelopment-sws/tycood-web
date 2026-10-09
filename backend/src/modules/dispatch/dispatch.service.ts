@@ -38,7 +38,7 @@ export class DispatchService {
   /**
    * Register or update a connected socket client
    */
-  registerClient(
+  async registerClient(
     socketId: string,
     data: {
       userId: string;
@@ -47,30 +47,60 @@ export class DispatchService {
       lat?: number;
       lng?: number;
       address?: string;
+      isOnline?: boolean;
     },
-  ) {
+  ): Promise<ConnectedProvider> {
+    const role = (data.role || 'DRIVER').toUpperCase();
+    const serviceCategory = (data.serviceCategory || 'CAB').toUpperCase();
+
+    let isOnline = false;
+    if (data.isOnline !== undefined) {
+      isOnline = data.isOnline;
+      const status = isOnline ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.OFFLINE;
+      try {
+        if (role === 'DRIVER') {
+          await this.driverProfileRepo.update({ userId: data.userId }, { availabilityStatus: status });
+        } else if (role === 'TECHNICIAN') {
+          await this.technicianProfileRepo.update({ userId: data.userId }, { availabilityStatus: status });
+        }
+      } catch (_) {}
+    } else {
+      try {
+        if (role === 'DRIVER') {
+          const driver = await this.driverProfileRepo.findOne({ where: { userId: data.userId } });
+          isOnline = driver?.availabilityStatus === AvailabilityStatus.AVAILABLE;
+        } else if (role === 'TECHNICIAN') {
+          const tech = await this.technicianProfileRepo.findOne({ where: { userId: data.userId } });
+          isOnline = tech?.availabilityStatus === AvailabilityStatus.AVAILABLE;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not read DB availability for user ${data.userId}: ${err?.message}`);
+      }
+    }
+
     const existing = this.connectedClients.get(socketId) || {
       socketId,
       userId: data.userId,
-      role: data.role || 'DRIVER',
-      serviceCategory: data.serviceCategory || 'CAB',
+      role,
+      serviceCategory,
       lat: data.lat ?? null,
       lng: data.lng ?? null,
       address: data.address,
-      isOnline: true,
+      isOnline,
       connectedAt: new Date(),
     };
 
     existing.userId = data.userId;
-    if (data.role) existing.role = data.role.toUpperCase();
-    if (data.serviceCategory) existing.serviceCategory = data.serviceCategory.toUpperCase();
+    existing.role = role;
+    existing.serviceCategory = serviceCategory;
+    existing.isOnline = isOnline;
     if (data.lat !== undefined) existing.lat = data.lat;
     if (data.lng !== undefined) existing.lng = data.lng;
     if (data.address !== undefined) existing.address = data.address;
 
     this.connectedClients.set(socketId, existing);
     this.logger.log(
-      `Registered client socket ${socketId} for user ${data.userId} (Role: ${existing.role}, Category: ${existing.serviceCategory})`,
+      `Registered client socket ${socketId} for user ${data.userId} (Role: ${role}, Category: ${serviceCategory}, isOnline: ${isOnline})`,
     );
 
     // Also persist current coordinates if provided
@@ -84,10 +114,29 @@ export class DispatchService {
   }
 
   /**
-   * Remove client on socket disconnection
+   * Remove client on socket disconnection and mark OFFLINE in DB
    */
-  unregisterClient(socketId: string) {
-    this.connectedClients.delete(socketId);
+  async unregisterClient(socketId: string) {
+    const client = this.connectedClients.get(socketId);
+    if (client) {
+      try {
+        if (client.role === 'DRIVER') {
+          await this.driverProfileRepo.update(
+            { userId: client.userId },
+            { availabilityStatus: AvailabilityStatus.OFFLINE },
+          );
+        } else if (client.role === 'TECHNICIAN') {
+          await this.technicianProfileRepo.update(
+            { userId: client.userId },
+            { availabilityStatus: AvailabilityStatus.OFFLINE },
+          );
+        }
+        this.logger.log(`Marked user ${client.userId} as OFFLINE in DB on socket disconnect`);
+      } catch (err: any) {
+        this.logger.warn(`Could not set OFFLINE on unregister for user ${client.userId}: ${err?.message}`);
+      }
+      this.connectedClients.delete(socketId);
+    }
   }
 
   /**
@@ -169,13 +218,34 @@ export class DispatchService {
   }
 
   /**
-   * Toggle provider online state
+   * Toggle provider online state and persist to database
    */
-  setProviderOnlineStatus(socketId: string, isOnline: boolean) {
+  async setProviderOnlineStatus(socketId: string, isOnline: boolean): Promise<ConnectedProvider | null> {
     const client = this.connectedClients.get(socketId);
-    if (client) {
-      client.isOnline = isOnline;
+    if (!client) return null;
+
+    client.isOnline = isOnline;
+    const status = isOnline ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.OFFLINE;
+
+    try {
+      if (client.role === 'DRIVER') {
+        await this.driverProfileRepo.update(
+          { userId: client.userId },
+          { availabilityStatus: status },
+        );
+        this.logger.log(`Persisted DriverProfile availabilityStatus=${status} for user ${client.userId}`);
+      } else if (client.role === 'TECHNICIAN') {
+        await this.technicianProfileRepo.update(
+          { userId: client.userId },
+          { availabilityStatus: status },
+        );
+        this.logger.log(`Persisted TechnicianProfile availabilityStatus=${status} for user ${client.userId}`);
+      }
+    } catch (err: any) {
+      this.logger.error(`Error saving availabilityStatus for user ${client.userId}: ${err?.message}`);
     }
+
+    return client;
   }
 
   /**

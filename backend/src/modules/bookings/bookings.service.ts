@@ -884,11 +884,10 @@ export class BookingsService {
       .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.vehicle', 'vehicle')
       .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
-      .leftJoin('driver_profiles', 'dp', 'dp.id = booking.driver_profile_id')
-      .where('(booking.user_id = :userId OR dp.user_id = :userId)', { userId });
+      .where('(booking.userId = :userId OR driverProfile.userId = :userId)', { userId });
 
     if (queryDto.serviceType) {
-      qb.andWhere('booking.service_type = :serviceType', {
+      qb.andWhere('booking.serviceType = :serviceType', {
         serviceType: queryDto.serviceType,
       });
     }

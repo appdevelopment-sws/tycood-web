@@ -47,7 +47,7 @@ export class DispatchGateway
    * Client registers their identity, role, and operational category (CAB, TECHNICIAN, PARKING)
    */
   @SubscribeMessage('register')
-  handleRegister(
+  async handleRegister(
     @ConnectedSocket() client: Socket,
     @MessageBody()
     data: {
@@ -57,6 +57,7 @@ export class DispatchGateway
       lat?: number;
       lng?: number;
       address?: string;
+      isOnline?: boolean;
     },
   ) {
     if (!data?.userId) {
@@ -69,26 +70,30 @@ export class DispatchGateway
     // Join user-specific private room
     client.join(`user_${data.userId}`);
 
-    // Join category dispatch room
-    client.join(`service_${category}`);
-
-    // Join role room
-    if (role === 'DRIVER') {
-      client.join('drivers');
-    } else if (role === 'TECHNICIAN') {
-      client.join('technicians');
-    }
-
-    this.dispatchService.registerClient(client.id, {
+    const registered = await this.dispatchService.registerClient(client.id, {
       ...data,
       serviceCategory: category,
       role,
     });
 
+    // ONLY join category room and role dispatch room if provider is ACTUALLY ONLINE
+    if (registered.isOnline) {
+      client.join(`service_${category}`);
+      if (role === 'DRIVER') {
+        client.join('drivers');
+      } else if (role === 'TECHNICIAN') {
+        client.join('technicians');
+      }
+    }
+
     return {
       success: true,
       socketId: client.id,
-      rooms: [`user_${data.userId}`, `service_${category}`],
+      isOnline: registered.isOnline,
+      rooms: [
+        `user_${data.userId}`,
+        ...(registered.isOnline ? [`service_${category}`] : []),
+      ],
     };
   }
 
@@ -125,11 +130,24 @@ export class DispatchGateway
    * Duty switch toggle (Online / Offline)
    */
   @SubscribeMessage('toggle_online')
-  handleToggleOnline(
+  async handleToggleOnline(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { isOnline: boolean },
   ) {
-    this.dispatchService.setProviderOnlineStatus(client.id, data.isOnline);
+    const updated = await this.dispatchService.setProviderOnlineStatus(client.id, data.isOnline);
+    const category = (updated?.serviceCategory || 'CAB').toUpperCase();
+    const role = (updated?.role || 'DRIVER').toUpperCase();
+
+    if (data.isOnline) {
+      client.join(`service_${category}`);
+      if (role === 'DRIVER') client.join('drivers');
+      if (role === 'TECHNICIAN') client.join('technicians');
+    } else {
+      client.leave(`service_${category}`);
+      if (role === 'DRIVER') client.leave('drivers');
+      if (role === 'TECHNICIAN') client.leave('technicians');
+    }
+
     return { success: true, isOnline: data.isOnline };
   }
 
@@ -163,7 +181,16 @@ export class DispatchGateway
         booking.metadata?.distanceKm ||
         12.0,
       fare: Number(booking.totalAmount),
+      totalAmount: Number(booking.totalAmount),
       baseFare: Number(booking.baseFare),
+      platformFee: Number(booking.platformFee ?? 49),
+      taxAmount: Number(booking.metadata?.fareBreakdown?.taxAmount ?? 0),
+      advanceAmount: Number(booking.advanceAmount ?? 0),
+      remainingAmount: Number(booking.remainingAmount ?? 0),
+      adminCommissionRate: Number(booking.adminCommissionRate ?? 20),
+      discountAmount: Number(booking.discountAmount ?? 0),
+      paymentStatus: booking.paymentStatus,
+      paymentMethod: booking.paymentMethod,
       passengerName: booking.passengerName,
       passengerPhone: booking.passengerPhone,
       otp: booking.otp,
@@ -171,7 +198,7 @@ export class DispatchGateway
       createdAt: booking.createdAt,
     };
 
-    // 1. Find candidate sockets within 20km radius
+    // 1. Find candidate sockets within 20km radius (strictly online)
     const targetSocketIds =
       await this.dispatchService.findEligibleProvidersWithinRadius(
         categoryUpper,
@@ -182,19 +209,16 @@ export class DispatchGateway
 
     if (targetSocketIds.length > 0) {
       this.logger.log(
-        `Dispatching booking ${booking.bookingNumber} to ${targetSocketIds.length} candidate sockets within 20km`,
+        `Dispatching booking ${booking.bookingNumber} to ${targetSocketIds.length} candidate online sockets within 20km`,
       );
       for (const socketId of targetSocketIds) {
         this.server.to(socketId).emit('new_booking_request', payload);
       }
     } else {
-      // If no sockets matched within exact radius, broadcast to general category room
-      this.logger.log(
-        `Broadcasting booking ${booking.bookingNumber} to room service_${categoryUpper}`,
+      // NEVER broadcast to offline clients or open broadcast rooms
+      this.logger.warn(
+        `No online ${categoryUpper} providers available within 20km radius for booking ${booking.bookingNumber}. Offline providers will not be notified.`,
       );
-      this.server
-        .to(`service_${categoryUpper}`)
-        .emit('new_booking_request', payload);
     }
   }
 
