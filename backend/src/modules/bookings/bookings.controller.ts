@@ -206,12 +206,14 @@ export class BookingsController {
     @Query('lat') lat?: number,
     @Query('lng') lng?: number,
     @Query('radiusKm') radiusKm?: number,
+    @Query('search') search?: string,
   ) {
     return this.bookingsService.getPendingDispatches({
       serviceType,
       lat: lat ? Number(lat) : undefined,
       lng: lng ? Number(lng) : undefined,
-      radiusKm: radiusKm ? Number(radiusKm) : 20,
+      radiusKm: radiusKm !== undefined ? Number(radiusKm) : undefined,
+      search,
     });
   }
 }

@@ -770,25 +770,40 @@ export class BookingsService {
     lat?: number;
     lng?: number;
     radiusKm?: number;
+    search?: string;
   }): Promise<Booking[]> {
     const qb = this.bookingRepo
       .createQueryBuilder('booking')
       .where('booking.status = :status', { status: BookingStatus.PENDING })
       .andWhere('booking.driver_profile_id IS NULL');
 
-    if (query.serviceType) {
+    if (query.serviceType && query.serviceType.toUpperCase() !== 'ALL') {
       qb.andWhere('booking.service_type = :serviceType', {
         serviceType: query.serviceType,
       });
     }
 
+    if (query.search && query.search.trim().length > 0) {
+      const searchTerm = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.passenger_name) LIKE :searchTerm)',
+        { searchTerm },
+      );
+    }
+
     qb.orderBy('booking.created_at', 'DESC');
-    qb.take(20);
+    qb.take(50);
 
     const bookings = await qb.getMany();
 
-    if (query.lat !== undefined && query.lng !== undefined && bookings.length > 0) {
-      const radius = query.radiusKm || 20;
+    if (
+      query.lat !== undefined &&
+      query.lng !== undefined &&
+      query.radiusKm !== undefined &&
+      query.radiusKm > 0 &&
+      bookings.length > 0
+    ) {
+      const radius = query.radiusKm;
       return bookings.filter((b) => {
         if (!b.pickupLat || !b.pickupLng) return true; // keep if coordinates unknown
         const dist = this.calculateHaversineDistanceKm(
