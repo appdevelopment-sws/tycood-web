@@ -35,8 +35,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     Tax,
     SystemSetting,
   ],
-  synchronize:
-    process.env.DB_SYNCHRONIZE === 'true' &&
-    process.env.NODE_ENV !== 'production',
-  logging: process.env.NODE_ENV === 'development',
+  synchronize: process.env.DB_SYNCHRONIZE === 'true',
+  logging:
+    process.env.DB_LOGGING === 'true' || process.env.NODE_ENV === 'development',
 });
