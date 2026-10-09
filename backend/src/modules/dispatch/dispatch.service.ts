@@ -114,27 +114,12 @@ export class DispatchService {
   }
 
   /**
-   * Remove client on socket disconnection and mark OFFLINE in DB
+   * Remove client on socket disconnection
    */
-  async unregisterClient(socketId: string) {
+  unregisterClient(socketId: string) {
     const client = this.connectedClients.get(socketId);
     if (client) {
-      try {
-        if (client.role === 'DRIVER') {
-          await this.driverProfileRepo.update(
-            { userId: client.userId },
-            { availabilityStatus: AvailabilityStatus.OFFLINE },
-          );
-        } else if (client.role === 'TECHNICIAN') {
-          await this.technicianProfileRepo.update(
-            { userId: client.userId },
-            { availabilityStatus: AvailabilityStatus.OFFLINE },
-          );
-        }
-        this.logger.log(`Marked user ${client.userId} as OFFLINE in DB on socket disconnect`);
-      } catch (err: any) {
-        this.logger.warn(`Could not set OFFLINE on unregister for user ${client.userId}: ${err?.message}`);
-      }
+      this.logger.log(`Unregistered socket ${socketId} for user ${client.userId}`);
       this.connectedClients.delete(socketId);
     }
   }
