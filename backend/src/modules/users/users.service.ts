@@ -148,7 +148,18 @@ export class UsersService {
           : (dto.roleName as BusinessRole);
     }
 
-    const role = await this.roleRepo.findOne({ where: { name: assignedRoleName } });
+    let role = await this.roleRepo.findOne({ where: { name: assignedRoleName } });
+    if (!role && assignedRoleName === BusinessRole.PARTNER) {
+      role = await this.roleRepo.save(
+        this.roleRepo.create({
+          name: BusinessRole.PARTNER,
+          displayName: 'Partner Applicant',
+          description: 'Registered service provider applicant',
+          permissions: ['applications:create', 'applications:read'],
+          isSystemRole: true,
+        }),
+      );
+    }
     if (role) {
       await this.userRoleRepo.save(
         this.userRoleRepo.create({

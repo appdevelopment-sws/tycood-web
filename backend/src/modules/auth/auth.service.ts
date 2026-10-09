@@ -25,7 +25,7 @@ export class AuthService {
         dto.userType.toUpperCase().trim() === 'PARTNER');
 
     const defaultRole = isProviderRegistration
-      ? BusinessRole.DRIVER
+      ? BusinessRole.PARTNER
       : BusinessRole.CUSTOMER;
 
     const user = await this.usersService.create(
@@ -86,6 +86,7 @@ export class AuthService {
     if (dto.userType) {
       const normalizedUserType = dto.userType.toUpperCase().trim();
       const providerRoles = [
+        BusinessRole.PARTNER,
         BusinessRole.DRIVER,
         BusinessRole.TECHNICIAN,
         BusinessRole.PARKING_OPERATOR,

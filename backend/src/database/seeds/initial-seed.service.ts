@@ -74,6 +74,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
         permissions: ['trips:read', 'bookings:read', 'bookings:create'],
       },
       {
+        name: BusinessRole.PARTNER,
+        displayName: 'Partner Applicant',
+        description: 'Registered service provider applicant',
+        permissions: ['applications:create', 'applications:read'],
+      },
+      {
         name: BusinessRole.DRIVER,
         displayName: 'Professional Driver',
         description: 'Approved fleet and cab driver partner',
