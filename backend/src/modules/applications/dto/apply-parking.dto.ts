@@ -53,6 +53,26 @@ export class ApplyParkingDto {
   @IsString()
   landmark?: string;
 
+  @ApiPropertyOptional({ example: 25.594095, description: 'GPS Latitude of the facility/landmark' })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 85.137566, description: 'GPS Longitude of the facility/landmark' })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @ApiPropertyOptional({ example: 25.594095, description: 'GPS Latitude of the prominent landmark' })
+  @IsOptional()
+  @IsNumber()
+  landmarkLatitude?: number;
+
+  @ApiPropertyOptional({ example: 85.137566, description: 'GPS Longitude of the prominent landmark' })
+  @IsOptional()
+  @IsNumber()
+  landmarkLongitude?: number;
+
   @ApiProperty({ example: 'Patna' })
   @IsString()
   @IsNotEmpty()

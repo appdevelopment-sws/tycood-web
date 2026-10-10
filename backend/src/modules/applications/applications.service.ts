@@ -267,6 +267,8 @@ export class ApplicationsService {
         name: dto.facilityName || `${dto.ownerName} Facility`,
         address: dto.address,
         landmark: dto.landmark,
+        latitude: dto.latitude ?? dto.landmarkLatitude ?? null,
+        longitude: dto.longitude ?? dto.landmarkLongitude ?? null,
         city: dto.city,
         pincode: dto.pincode,
         facilityStructure: dto.facilityStructure || 'Covered Basement & Ground',
