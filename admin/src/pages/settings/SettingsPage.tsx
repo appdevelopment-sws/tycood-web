@@ -985,7 +985,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            {/* Admin Commission & Prepaid Advance Setting Card */}
+            {/* 1. Driver Rides Admin Commission & Prepaid Advance Setting Card */}
             <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-5 dark:border-amber-500/20">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -994,10 +994,10 @@ export const SettingsPage: React.FC = () => {
                       <Percent className="h-4 w-4" />
                     </span>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                      Admin Commission & Prepaid Booking Advance
+                      Driver Rides: Admin Commission & Prepaid Advance
                     </h4>
                     <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
-                      Active Booking Logic
+                      Active Ride Logic
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 max-w-2xl">
@@ -1028,7 +1028,7 @@ export const SettingsPage: React.FC = () => {
 
               {/* Dynamic split explanation example */}
               <div className="mt-3.5 flex flex-wrap items-center gap-3 pt-3 border-t border-amber-500/20 text-xs">
-                <span className="font-semibold text-slate-500 dark:text-slate-400">Example on ₹1,000 Fare:</span>
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Example on ₹1,000 Ride Fare:</span>
                 <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   Prepaid Now: ₹{((1000 * (Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20)) / 100).toFixed(0)} ({Number(editedKeys["ADMIN_COMMISSION_PERCENTAGE"]) || 20}%)
                 </span>
@@ -1038,7 +1038,60 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            {/* 2. Parking Bookings Admin Commission & Prepaid Advance Setting Card */}
+            <div className="rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent p-5 dark:border-blue-500/20">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+                      <Percent className="h-4 w-4" />
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Parking Spots: Admin Commission & Prepaid Advance
+                    </h4>
+                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+                      Active Parking Logic
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 max-w-2xl">
+                    Users pay only this percentage amount as upfront prepaid booking advance to reserve their parking bay. The remaining balance ({100 - (Number(editedKeys["PARKING_COMMISSION_PERCENTAGE"]) || 20)}%) is paid to the parking operator at entry/exit.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative w-36">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={editedKeys["PARKING_COMMISSION_PERCENTAGE"] ?? "20"}
+                      onChange={(e) =>
+                        handleKeyChange("PARKING_COMMISSION_PERCENTAGE", e.target.value)
+                      }
+                      placeholder="20"
+                      className="w-full rounded-xl border border-blue-400 bg-white py-2.5 pr-8 pl-3.5 text-sm font-bold text-slate-900 transition outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-blue-500/40 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                    <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm font-bold text-blue-600 dark:text-blue-400">
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic split explanation example */}
+              <div className="mt-3.5 flex flex-wrap items-center gap-3 pt-3 border-t border-blue-500/20 text-xs">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Example on ₹200 Parking Reservation:</span>
+                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Prepaid Now: ₹{((200 * (Number(editedKeys["PARKING_COMMISSION_PERCENTAGE"]) || 20)) / 100).toFixed(0)} ({Number(editedKeys["PARKING_COMMISSION_PERCENTAGE"]) || 20}%)
+                </span>
+                <span className="rounded-md bg-indigo-500/10 px-2 py-0.5 font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  Balance at Gate: ₹{(200 - (200 * (Number(editedKeys["PARKING_COMMISSION_PERCENTAGE"]) || 20)) / 100).toFixed(0)} ({100 - (Number(editedKeys["PARKING_COMMISSION_PERCENTAGE"]) || 20)}%)
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold tracking-wider text-slate-700 uppercase dark:text-slate-300">
                   Primary Platform Currency
@@ -1057,32 +1110,8 @@ export const SettingsPage: React.FC = () => {
                   <option value="AED">AED (د.إ) - UAE Dirham</option>
                 </select>
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Default currency formatted across checkout, driver earnings,
-                  and tax bills.
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold tracking-wider text-slate-700 uppercase dark:text-slate-300">
-                  Platform Facilitation Fee
-                </label>
-                <div className="relative">
-                  <span className="absolute top-1/2 left-3.5 -translate-y-1/2 text-xs font-bold text-slate-400">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    value={editedKeys["PLATFORM_BASE_FEE"] || "49"}
-                    onChange={(e) =>
-                      handleKeyChange("PLATFORM_BASE_FEE", e.target.value)
-                    }
-                    placeholder="49"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pr-3.5 pl-8 text-xs font-semibold text-slate-900 transition outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Platform convenience commission fee retained per completed
-                  booking.
+                  Default currency formatted across checkout, driver/operator earnings,
+                  and receipts.
                 </p>
               </div>
 

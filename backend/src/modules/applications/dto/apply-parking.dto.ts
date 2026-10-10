@@ -165,6 +165,27 @@ export class ApplyParkingDto {
   @Min(0)
   bikeHourlyRate?: number;
 
+  @ApiPropertyOptional({
+    description: 'Dynamic extra add-on services and custom pricing configured by provider',
+    example: [
+      {
+        id: 'valet',
+        title: 'VIP Valet Assist',
+        subtitle: 'Dedicated valet driver parks & retrieves at main porch',
+        price: 50,
+      },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  addonServices?: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    price: number;
+    icon?: string;
+  }>;
+
   // Step 5: Documents
   @ApiPropertyOptional({ example: true })
   @IsOptional()

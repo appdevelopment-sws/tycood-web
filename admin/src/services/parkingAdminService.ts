@@ -87,6 +87,30 @@ export const parkingAdminService = {
     })
   },
 
+  toggleOperatorStatus: async (id: string): Promise<any> => {
+    return apiClient<any>(`/parking/operators/${id}/toggle-status`, {
+      method: "PATCH",
+    })
+  },
+
+  deleteOperator: async (id: string): Promise<any> => {
+    return apiClient<any>(`/parking/operators/${id}`, {
+      method: "DELETE",
+    })
+  },
+
+  toggleLocationStatus: async (id: string): Promise<any> => {
+    return apiClient<any>(`/parking/locations/${id}/toggle-status`, {
+      method: "PATCH",
+    })
+  },
+
+  deleteLocation: async (id: string): Promise<any> => {
+    return apiClient<any>(`/parking/locations/${id}`, {
+      method: "DELETE",
+    })
+  },
+
   getParkingSettings: async (): Promise<ParkingSettings> => {
     return apiClient<ParkingSettings>("/parking/admin/settings")
   },

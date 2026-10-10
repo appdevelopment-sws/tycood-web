@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -334,5 +335,52 @@ export class ParkingController {
     @CurrentUser() admin: CurrentUserDto,
   ) {
     return this.parkingService.rejectOperator(id, admin.userId, dto?.rejectionReason);
+  }
+
+  @Patch('operators/:id/toggle-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle parking operator active / disabled status (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Operator UUID' })
+  @ApiResponse({ status: 200, description: 'Updated parking operator status' })
+  async toggleOperatorStatus(
+    @Param('id') id: string,
+    @CurrentUser() admin: CurrentUserDto,
+  ) {
+    return this.parkingService.toggleOperatorStatus(id, admin.userId);
+  }
+
+  @Delete('operators/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete parking operator and facilities (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Operator UUID' })
+  @ApiResponse({ status: 200, description: 'Operator deleted successfully' })
+  async deleteOperator(@Param('id') id: string) {
+    return this.parkingService.deleteOperator(id);
+  }
+
+  @Patch('locations/:id/toggle-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle parking location active / disabled status (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Location UUID' })
+  @ApiResponse({ status: 200, description: 'Updated parking location status' })
+  async toggleLocationStatus(@Param('id') id: string) {
+    return this.parkingService.toggleLocationStatus(id);
+  }
+
+  @Delete('locations/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete parking location facility (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Parking Location UUID' })
+  @ApiResponse({ status: 200, description: 'Location deleted successfully' })
+  async deleteLocation(@Param('id') id: string) {
+    return this.parkingService.deleteLocation(id);
   }
 }

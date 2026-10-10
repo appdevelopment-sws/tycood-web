@@ -1,5 +1,5 @@
 import React from "react"
-import { CheckCircle2, SquareParking } from "lucide-react"
+import { CheckCircle2, SquareParking, Trash2, PowerOff, Power } from "lucide-react"
 import { FormContainer } from "@/components/formContainer"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/common/StatusBadge"
@@ -12,6 +12,9 @@ export interface ParkingDrawerProps {
   operator?: (ParkingOperatorItem & { viewMode?: boolean }) | null
   onVerify?: (id: string) => void
   isVerifying?: boolean
+  onToggleStatus?: (id: string) => void
+  isTogglingStatus?: boolean
+  onDelete?: (operator: ParkingOperatorItem) => void
 }
 
 export const ParkingDrawer: React.FC<ParkingDrawerProps> = ({
@@ -20,6 +23,9 @@ export const ParkingDrawer: React.FC<ParkingDrawerProps> = ({
   operator,
   onVerify,
   isVerifying,
+  onToggleStatus,
+  isTogglingStatus,
+  onDelete,
 }) => {
   if (!operator) return null
 
@@ -34,19 +40,54 @@ export const ParkingDrawer: React.FC<ParkingDrawerProps> = ({
       size="md"
       footer={
         <div className="flex w-full items-center justify-between">
-          <Button variant="outline" onClick={() => onClose(false)}>
-            Close
-          </Button>
-          {operator.verificationStatus !== "VERIFIED" && onVerify && (
-            <Button
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => onVerify(operator.id)}
-              disabled={isVerifying}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Verify & Approve Operator
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onClose(false)}>
+              Close
             </Button>
-          )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                className="gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 text-xs"
+                onClick={() => onDelete(operator)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remove Facility
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {operator.verificationStatus === "PENDING" && onVerify && (
+              <Button
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                onClick={() => onVerify(operator.id)}
+                disabled={isVerifying}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Verify & Approve Operator
+              </Button>
+            )}
+            {operator.verificationStatus === "VERIFIED" && onToggleStatus && (
+              <Button
+                variant="outline"
+                className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/40 text-xs"
+                onClick={() => onToggleStatus(operator.id)}
+                disabled={isTogglingStatus}
+              >
+                <PowerOff className="h-3.5 w-3.5" />
+                Disable Facility
+              </Button>
+            )}
+            {operator.verificationStatus === "SUSPENDED" && onToggleStatus && (
+              <Button
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                onClick={() => onToggleStatus(operator.id)}
+                disabled={isTogglingStatus}
+              >
+                <Power className="h-3.5 w-3.5" />
+                Enable Facility
+              </Button>
+            )}
+          </div>
         </div>
       }
     >

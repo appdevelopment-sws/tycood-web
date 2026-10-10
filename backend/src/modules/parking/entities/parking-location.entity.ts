@@ -22,23 +22,23 @@ export class ParkingLocation {
   @Column({ name: 'operator_id', type: 'uuid' })
   operatorId: string;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   name: string;
 
   @Column({ type: 'text' })
   address: string;
 
-  @Column({ length: 255, nullable: true })
-  landmark: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  landmark: string | null;
 
   @Index()
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   city: string;
 
-  @Column({ length: 20, nullable: true })
-  pincode: string;
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  pincode: string | null;
 
-  @Column({ name: 'facility_structure', length: 100, default: 'Covered Basement & Ground' })
+  @Column({ name: 'facility_structure', type: 'varchar', length: 100, default: 'Covered Basement & Ground' })
   facilityStructure: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
@@ -124,6 +124,15 @@ export class ParkingLocation {
 
   @Column({ type: 'text', array: true, default: '{}' })
   amenities: string[];
+
+  @Column({ name: 'addon_services', type: 'jsonb', default: () => "'[]'" })
+  addonServices: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    price: number;
+    icon?: string;
+  }>;
 
   @Index()
   @Column({

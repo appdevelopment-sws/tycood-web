@@ -82,6 +82,20 @@ export class SettingsService implements OnModuleInit {
       }
       await this.settingRepo.save(setting);
       updated.push(setting);
+
+      // Auto-sync parking commission and advance rate when unified percentage is updated
+      if (key === 'PARKING_COMMISSION_PERCENTAGE') {
+        const commRate = await this.settingRepo.findOne({ where: { key: 'PARKING_COMMISSION_RATE' } });
+        if (commRate) {
+          commRate.value = String(value);
+          await this.settingRepo.save(commRate);
+        }
+        const advVal = await this.settingRepo.findOne({ where: { key: 'PARKING_ADVANCE_VALUE' } });
+        if (advVal) {
+          advVal.value = String(value);
+          await this.settingRepo.save(advVal);
+        }
+      }
     }
 
     return this.getAllSettings(false);
@@ -277,6 +291,13 @@ export class SettingsService implements OnModuleInit {
         isSecret: false,
       },
       // Parking platform defaults
+      {
+        key: 'PARKING_COMMISSION_PERCENTAGE',
+        value: '20',
+        category: 'GENERAL',
+        description: 'Parking admin commission and prepaid booking advance percentage (%) required upfront',
+        isSecret: false,
+      },
       {
         key: 'PARKING_BOOKING_ENABLED',
         value: 'true',

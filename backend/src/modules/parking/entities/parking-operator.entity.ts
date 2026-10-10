@@ -24,25 +24,26 @@ export class ParkingOperator {
 
   @Column({
     name: 'business_type',
+    type: 'varchar',
     length: 100,
     default: 'Commercial Operator',
   })
   businessType: string;
 
-  @Column({ name: 'facility_name', length: 255, nullable: true })
-  facilityName: string;
+  @Column({ name: 'facility_name', type: 'varchar', length: 255, nullable: true })
+  facilityName: string | null;
 
-  @Column({ name: 'owner_name', length: 255 })
+  @Column({ name: 'owner_name', type: 'varchar', length: 255 })
   ownerName: string;
 
-  @Column({ name: 'business_phone', length: 50 })
+  @Column({ name: 'business_phone', type: 'varchar', length: 50 })
   businessPhone: string;
 
-  @Column({ name: 'business_email', length: 255, nullable: true })
-  businessEmail: string;
+  @Column({ name: 'business_email', type: 'varchar', length: 255, nullable: true })
+  businessEmail: string | null;
 
-  @Column({ length: 50, nullable: true })
-  gstin: string;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  gstin: string | null;
 
   @Column({ name: 'ownership_proof_uploaded', type: 'boolean', default: false })
   ownershipProofUploaded: boolean;
@@ -53,17 +54,17 @@ export class ParkingOperator {
   @Column({ name: 'facility_photos_uploaded', type: 'boolean', default: false })
   facilityPhotosUploaded: boolean;
 
-  @Column({ name: 'account_holder', length: 255, nullable: true })
-  accountHolder: string;
+  @Column({ name: 'account_holder', type: 'varchar', length: 255, nullable: true })
+  accountHolder: string | null;
 
-  @Column({ name: 'bank_name', length: 255, nullable: true })
-  bankName: string;
+  @Column({ name: 'bank_name', type: 'varchar', length: 255, nullable: true })
+  bankName: string | null;
 
-  @Column({ name: 'account_number', length: 100, nullable: true })
-  accountNumber: string;
+  @Column({ name: 'account_number', type: 'varchar', length: 100, nullable: true })
+  accountNumber: string | null;
 
-  @Column({ name: 'ifsc_code', length: 32, nullable: true })
-  ifscCode: string;
+  @Column({ name: 'ifsc_code', type: 'varchar', length: 32, nullable: true })
+  ifscCode: string | null;
 
   @Index()
   @Column({

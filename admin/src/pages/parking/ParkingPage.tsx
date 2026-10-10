@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   SquareParking,
@@ -7,12 +7,14 @@ import {
   Eye,
   Percent,
   Receipt,
-  Save,
   ShieldCheck,
   Building2,
-  Coins,
-  ArrowRightLeft,
+  PowerOff,
+  Power,
+  Trash2,
+  Ban,
 } from "lucide-react"
+import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/common/DataTable"
@@ -28,12 +30,12 @@ import { StatusBadge } from "@/components/common/StatusBadge"
 import {
   parkingAdminService,
   type ParkingOperatorItem,
-  type ParkingSettings,
   type ParkingBookingAdminItem,
 } from "@/services/parkingAdminService"
+import { settingService } from "@/services/settingService"
 import ParkingDrawer from "@/components/dialog/ParkingDrawer"
 
-type ParkingTab = "operators" | "settings" | "bookings"
+type ParkingTab = "operators" | "bookings"
 
 const INITIAL_PARKING_FILTERS = {
   search: "",
@@ -51,6 +53,8 @@ export const ParkingPage = () => {
 
   const drawerDisclosure = useDisclosure<ParkingOperatorItem>()
   const rejectDisclosure = useDisclosure<ParkingOperatorItem>()
+  const deleteDisclosure = useDisclosure<ParkingOperatorItem>()
+  const disableDisclosure = useDisclosure<ParkingOperatorItem>()
   const [rejectReason, setRejectReason] = useState("")
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_PARKING_FILTERS)
@@ -68,32 +72,17 @@ export const ParkingPage = () => {
     },
   })
 
-  // 2. Settings Query
-  const { data: parkingSettings, isLoading: isLoadingSettings } = useQuery<ParkingSettings>({
-    queryKey: ["parking-admin-settings"],
-    queryFn: () => parkingAdminService.getParkingSettings(),
+  // 2. System Settings (for unified parking commission display)
+  const { data: systemSettingsResponse } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => settingService.getSettings(),
   })
-
-  // Settings local edit form state
-  const [settingsForm, setSettingsForm] = useState<Partial<ParkingSettings>>({
-    enabled: true,
-    commissionType: "PERCENTAGE",
-    commissionValue: 15,
-    advancePaymentType: "PERCENTAGE",
-    advancePaymentValue: 25,
-    minAdvanceAmount: 20,
-    maxAdvanceAmount: 500,
-    cancellationWindowHours: 1,
-    refundDeductionPercentage: 10,
-    gracePeriodMinutes: 15,
-    overtimeHourlyRateMultiplier: 1.25,
-  })
-
-  useEffect(() => {
-    if (parkingSettings) {
-      setSettingsForm(parkingSettings)
-    }
-  }, [parkingSettings])
+  const parkingCommissionSetting =
+    systemSettingsResponse?.settings?.["PARKING_COMMISSION_PERCENTAGE"]
+  const parkingCommissionPercentage =
+    typeof parkingCommissionSetting === "object"
+      ? parkingCommissionSetting?.value || "20"
+      : String(parkingCommissionSetting || "20")
 
   // 3. Bookings Ledger Query
   const { data: bookingsResponse, isLoading: isLoadingBookings } = useQuery({
@@ -134,15 +123,28 @@ export const ParkingPage = () => {
     },
   })
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: (newSettings: Partial<ParkingSettings>) =>
-      parkingAdminService.updateParkingSettings(newSettings),
+  const toggleStatusMutation = useMutation({
+    mutationFn: (id: string) => parkingAdminService.toggleOperatorStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["parking-admin-settings"] })
-      toast.success("Parking commission and advance payment settings updated successfully!")
+      queryClient.invalidateQueries({ queryKey: ["parking-operators"] })
+      disableDisclosure.onClose()
+      toast.success("Parking operator status toggled successfully!")
     },
     onError: (err: any) => {
-      toast.error(err.message || "Failed to update settings")
+      toast.error(err.message || "Failed to toggle operator status")
+    },
+  })
+
+  const deleteOperatorMutation = useMutation({
+    mutationFn: (id: string) => parkingAdminService.deleteOperator(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["parking-operators"] })
+      deleteDisclosure.onClose()
+      drawerDisclosure.onClose()
+      toast.success("Parking facility and associated data permanently removed.")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete parking facility")
     },
   })
 
@@ -233,7 +235,7 @@ export const ParkingPage = () => {
         },
       },
       {
-        header: "Verification",
+        header: "Status",
         cell: (row) => (
           <StatusBadge status={row.verificationStatus || "PENDING"} />
         ),
@@ -243,7 +245,7 @@ export const ParkingPage = () => {
         className: "text-right",
         cell: (row) => (
           <div className="flex items-center justify-end gap-1.5">
-            {row.verificationStatus !== "VERIFIED" ? (
+            {row.verificationStatus === "PENDING" && (
               <>
                 <Button
                   size="sm"
@@ -264,18 +266,52 @@ export const ParkingPage = () => {
                   Reject
                 </Button>
               </>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Verified
-              </span>
             )}
 
+            {row.verificationStatus === "VERIFIED" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/40 px-2 text-xs font-medium"
+                onClick={() => disableDisclosure.onOpen(row)}
+                title="Disable facility"
+              >
+                <PowerOff className="h-3.5 w-3.5" />
+                Disable
+              </Button>
+            )}
+
+            {row.verificationStatus === "SUSPENDED" && (
+              <Button
+                size="sm"
+                className="h-8 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 text-xs font-semibold shadow-xs"
+                onClick={() => toggleStatusMutation.mutate(row.id)}
+                disabled={toggleStatusMutation.isPending}
+                title="Enable facility"
+              >
+                <Power className="h-3.5 w-3.5" />
+                Enable
+              </Button>
+            )}
+
+            {/* Remove / Delete Action */}
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+              onClick={() => deleteDisclosure.onOpen(row)}
+              title="Delete facility permanently"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+
+            {/* View Details Drawer */}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               onClick={() => handleOpen(row)}
+              title="View facility details"
             >
               <Eye className="h-4 w-4" />
             </Button>
@@ -283,7 +319,13 @@ export const ParkingPage = () => {
         ),
       },
     ]
-  }, [verifyMutation, rejectDisclosure])
+  }, [
+    verifyMutation,
+    rejectDisclosure,
+    disableDisclosure,
+    deleteDisclosure,
+    toggleStatusMutation,
+  ])
 
   // Columns for Bookings Ledger
   const bookingColumns: Column<ParkingBookingAdminItem>[] = useMemo(() => {
@@ -375,12 +417,16 @@ export const ParkingPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Drawer */}
       <ParkingDrawer
         open={drawerDisclosure.isOpen}
         onClose={drawerDisclosure.onClose}
         operator={drawerDisclosure.data}
         onVerify={(id) => verifyMutation.mutate(id)}
         isVerifying={verifyMutation.isPending}
+        onToggleStatus={(id) => toggleStatusMutation.mutate(id)}
+        isTogglingStatus={toggleStatusMutation.isPending}
+        onDelete={(op) => deleteDisclosure.onOpen(op)}
       />
 
       {/* Reject Confirmation */}
@@ -397,6 +443,38 @@ export const ParkingPage = () => {
         }
         isLoading={rejectMutation.isPending}
         confirmText="Reject Registration"
+        variant="danger"
+      />
+
+      {/* Disable Confirmation */}
+      <ConfirmDialog
+        open={disableDisclosure.isOpen}
+        onOpenChange={disableDisclosure.onClose}
+        title="Disable Parking Facility"
+        description={`Are you sure you want to disable "${disableDisclosure.data?.facilityName}"? Users will temporarily no longer be able to find or book slots at this facility.`}
+        onConfirm={() => {
+          if (disableDisclosure.data?.id) {
+            toggleStatusMutation.mutate(disableDisclosure.data.id)
+          }
+        }}
+        isLoading={toggleStatusMutation.isPending}
+        confirmText="Disable Facility"
+        variant="danger"
+      />
+
+      {/* Delete / Remove Confirmation */}
+      <ConfirmDialog
+        open={deleteDisclosure.isOpen}
+        onOpenChange={deleteDisclosure.onClose}
+        title="Permanently Delete Parking Facility"
+        description={`Are you sure you want to permanently delete "${deleteDisclosure.data?.facilityName}" (${deleteDisclosure.data?.ownerName})? All associated bays, floors, and location records will be removed.`}
+        onConfirm={() => {
+          if (deleteDisclosure.data?.id) {
+            deleteOperatorMutation.mutate(deleteDisclosure.data.id)
+          }
+        }}
+        isLoading={deleteOperatorMutation.isPending}
+        confirmText="Delete Facility"
         variant="danger"
       />
 
@@ -430,36 +508,40 @@ export const ParkingPage = () => {
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            <Percent className="h-3.5 w-3.5 text-indigo-500" />
-            Platform Commission
+            <Ban className="h-3.5 w-3.5 text-rose-500" />
+            Disabled / Suspended
           </div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {parkingSettings?.commissionType === "FIXED"
-                ? `₹${parkingSettings.commissionValue}`
-                : `${parkingSettings?.commissionValue ?? 15}%`}
+            <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+              {operators.filter((o) => o.verificationStatus === "SUSPENDED").length}
             </span>
-            <span className="text-xs text-slate-400">per booking</span>
+            <span className="text-xs text-slate-400">inactive facilities</span>
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            <Coins className="h-3.5 w-3.5 text-amber-500" />
-            Advance Deposit
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <Percent className="h-3.5 w-3.5 text-indigo-500" />
+              Platform Commission
+            </div>
+            <Link
+              to="/admin/settings"
+              className="text-[10px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+            >
+              Edit in Settings →
+            </Link>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-              {parkingSettings?.advancePaymentType === "FIXED"
-                ? `₹${parkingSettings.advancePaymentValue}`
-                : `${parkingSettings?.advancePaymentValue ?? 25}%`}
+            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+              {parkingCommissionPercentage}%
             </span>
-            <span className="text-xs text-slate-400">upfront hold</span>
+            <span className="text-xs text-slate-400">prepaid advance & cut</span>
           </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Clean Tab Navigation - Unwanted settings removed */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 dark:border-slate-800">
         <button
           type="button"
@@ -472,19 +554,6 @@ export const ParkingPage = () => {
         >
           <SquareParking className="h-4 w-4" />
           <span>Facilities & Operators</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("settings")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-            activeTab === "settings"
-              ? "bg-blue-600 text-white shadow-sm dark:bg-blue-500"
-              : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/80"
-          }`}
-        >
-          <Percent className="h-4 w-4" />
-          <span>Parking Commission & Advance Settings</span>
         </button>
 
         <button
@@ -507,7 +576,7 @@ export const ParkingPage = () => {
       {activeTab === "operators" && (
         <SectionCard
           title="Parking Facilities & Operators"
-          description="Verify commercial parking operators, approve inventory capacity, and oversee digital parking facilities"
+          description="Verify, enable, disable, and manage commercial parking operators and digital parking facilities"
         >
           <div className="space-y-4">
             <FilterBar
@@ -529,6 +598,7 @@ export const ParkingPage = () => {
                   { label: "All Verification States", value: "" },
                   { label: "Pending Verification", value: "PENDING" },
                   { label: "Verified & Active", value: "VERIFIED" },
+                  { label: "Disabled / Suspended", value: "SUSPENDED" },
                   { label: "Rejected", value: "REJECTED" },
                 ]}
                 className="w-48"
@@ -545,298 +615,7 @@ export const ParkingPage = () => {
       )}
 
       {/* ==================================================== */}
-      {/* TAB 2: PARKING COMMISSION & ADVANCE SETTINGS */}
-      {/* ==================================================== */}
-      {activeTab === "settings" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <SectionCard
-              title="Parking Commission & Upfront Advance Configuration"
-              description="Configure independent platform commission, advance deposit requirements, and overtime billing policies for parking reservations."
-            >
-              {isLoadingSettings ? (
-                <div className="p-8 text-center text-sm text-slate-500">Loading settings...</div>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    updateSettingsMutation.mutate(settingsForm)
-                  }}
-                  className="space-y-6"
-                >
-                  {/* Service Toggle */}
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <div>
-                      <div className="font-semibold text-sm text-slate-900 dark:text-slate-100">
-                        Enable Parking Booking Service
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        When disabled, users cannot search or reserve new parking spaces on the mobile apps.
-                      </div>
-                    </div>
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={!!settingsForm.enabled}
-                        onChange={(e) =>
-                          setSettingsForm({ ...settingsForm, enabled: e.target.checked })
-                        }
-                        className="peer sr-only"
-                      />
-                      <div className="peer h-6 w-11 rounded-full bg-slate-300 peer-checked:bg-blue-600 peer-focus:outline-none after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-slate-700"></div>
-                    </label>
-                  </div>
-
-                  {/* Section 1: Platform Commission */}
-                  <div className="space-y-4">
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Percent className="h-4 w-4 text-blue-600" />
-                      1. Platform Commission Settings
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Commission Calculation Type
-                        </label>
-                        <select
-                          value={settingsForm.commissionType}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              commissionType: e.target.value as "PERCENTAGE" | "FIXED",
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          <option value="PERCENTAGE">Percentage (%) of Total Booking Fare</option>
-                          <option value="FIXED">Fixed Amount (₹) per Completed Booking</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Commission Value ({settingsForm.commissionType === "PERCENTAGE" ? "%" : "₹"})
-                        </label>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          max="100"
-                          value={settingsForm.commissionValue ?? 15}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              commissionValue: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 2: Advance Payment Policy */}
-                  <div className="space-y-4">
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Coins className="h-4 w-4 text-amber-600" />
-                      2. Advance Payment & Upfront Hold Policy
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Advance Payment Rule
-                        </label>
-                        <select
-                          value={settingsForm.advancePaymentType}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              advancePaymentType: e.target.value as "PERCENTAGE" | "FIXED",
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          <option value="PERCENTAGE">Percentage (%) of Estimated Fare</option>
-                          <option value="FIXED">Fixed Flat Deposit (₹)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Advance Amount ({settingsForm.advancePaymentType === "PERCENTAGE" ? "%" : "₹"})
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={settingsForm.advancePaymentValue ?? 25}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              advancePaymentValue: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Minimum Advance Floor (₹)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={settingsForm.minAdvanceAmount ?? 20}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              minAdvanceAmount: parseInt(e.target.value, 10) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Maximum Advance Ceiling (₹)
-                        </label>
-                        <input
-                          type="number"
-                          min="10"
-                          value={settingsForm.maxAdvanceAmount ?? 500}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              maxAdvanceAmount: parseInt(e.target.value, 10) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 3: Cancellation, Grace & Overtime */}
-                  <div className="space-y-4">
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <ArrowRightLeft className="h-4 w-4 text-emerald-600" />
-                      3. Cancellation, Grace Period & Overtime Multipliers
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Free Cancellation Window (Hours)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={settingsForm.cancellationWindowHours ?? 1}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              cancellationWindowHours: parseInt(e.target.value, 10) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Late Cancellation Penalty (%)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={settingsForm.refundDeductionPercentage ?? 10}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              refundDeductionPercentage: parseInt(e.target.value, 10) || 0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Overtime Multiplier (x)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="1"
-                          value={settingsForm.overtimeHourlyRateMultiplier ?? 1.25}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              overtimeHourlyRateMultiplier: parseFloat(e.target.value) || 1.0,
-                            })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <Button
-                      type="submit"
-                      disabled={updateSettingsMutation.isPending}
-                      className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-5 h-9"
-                    >
-                      <Save className="h-4 w-4" />
-                      {updateSettingsMutation.isPending ? "Saving..." : "Save Parking Settings"}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </SectionCard>
-          </div>
-
-          {/* Audit Rule Explanation Card */}
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                Commission Architecture Safeguards
-              </h4>
-              <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                <li className="flex items-start gap-1.5">
-                  <span className="font-bold text-blue-600">•</span>
-                  <span>
-                    <strong>Strict Independence:</strong> Driver and Parking commission rules operate independently and will never cross-pollinate.
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="font-bold text-blue-600">•</span>
-                  <span>
-                    <strong>Snapshot Immobility:</strong> Changes apply exclusively to future bookings. Past or active bookings retain their rate snapshot.
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="font-bold text-blue-600">•</span>
-                  <span>
-                    <strong>Advance Credit Deduction:</strong> The advance amount paid by the customer is automatically subtracted from the exit balance, preventing double charges.
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="font-bold text-blue-600">•</span>
-                  <span>
-                    <strong>Atomic Capacity Locking:</strong> Slot holds use row-level pessimistic locking to eliminate concurrent overbooking.
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================== */}
-      {/* TAB 3: GLOBAL BOOKINGS LEDGER */}
+      {/* TAB 2: GLOBAL BOOKINGS LEDGER */}
       {/* ==================================================== */}
       {activeTab === "bookings" && (
         <SectionCard

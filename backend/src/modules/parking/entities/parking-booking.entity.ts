@@ -28,7 +28,7 @@ export class ParkingBooking {
   id: string;
 
   @Index({ unique: true })
-  @Column({ name: 'booking_number', length: 50, unique: true })
+  @Column({ name: 'booking_number', type: 'varchar', length: 50, unique: true })
   bookingNumber: string;
 
   @Index()
@@ -47,7 +47,7 @@ export class ParkingBooking {
   })
   vehicleType: ParkingVehicleType;
 
-  @Column({ name: 'vehicle_number', length: 50 })
+  @Column({ name: 'vehicle_number', type: 'varchar', length: 50 })
   vehicleNumber: string;
 
   @Index()
@@ -66,10 +66,10 @@ export class ParkingBooking {
   @Column({ name: 'actual_check_out_time', type: 'timestamptz', nullable: true })
   actualCheckOutTime: Date | null;
 
-  @Column({ name: 'allocated_floor', length: 50, nullable: true })
+  @Column({ name: 'allocated_floor', type: 'varchar', length: 50, nullable: true })
   allocatedFloor: string | null;
 
-  @Column({ name: 'allocated_bay', length: 50, nullable: true })
+  @Column({ name: 'allocated_bay', type: 'varchar', length: 50, nullable: true })
   allocatedBay: string | null;
 
   // Rate snapshot
@@ -169,10 +169,10 @@ export class ParkingBooking {
   @Column({ name: 'remaining_paid_at', type: 'timestamptz', nullable: true })
   remainingPaidAt: Date | null;
 
-  @Column({ name: 'payment_method', length: 50, default: 'UPI' })
+  @Column({ name: 'payment_method', type: 'varchar', length: 50, default: 'UPI' })
   paymentMethod: string;
 
-  @Column({ name: 'transaction_id', length: 100, nullable: true })
+  @Column({ name: 'transaction_id', type: 'varchar', length: 100, nullable: true })
   transactionId: string | null;
 
   // Commission & settlement snapshot
@@ -243,7 +243,7 @@ export class ParkingBooking {
   refundAmount: number;
 
   // Access pass
-  @Column({ name: 'gate_pin_otp', length: 10 })
+  @Column({ name: 'gate_pin_otp', type: 'varchar', length: 10 })
   gatePinOtp: string;
 
   @Column({ name: 'qr_code_payload', type: 'text' })

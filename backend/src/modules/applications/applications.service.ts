@@ -291,6 +291,7 @@ export class ApplicationsService {
           'Covered Shade',
           'Automated Barrier Gate',
         ],
+        addonServices: dto.addonServices || [],
         status: ParkingLocationStatus.INACTIVE, // Unapproved until operator is verified
       });
       await manager.save(location);
@@ -374,10 +375,41 @@ export class ApplicationsService {
     };
   }
 
-  async findByUserId(userId: string): Promise<ProfessionalApplication[]> {
-    return this.appRepo.find({
+  async findByUserId(userId: string): Promise<any[]> {
+    const apps = await this.appRepo.find({
       where: { userId },
       order: { submittedAt: 'DESC' },
+    });
+
+    const [parkingOp, driverProfile, techProfile] = await Promise.all([
+      this.parkingOpRepo.findOne({ where: { userId } }),
+      this.driverProfileRepo.findOne({ where: { userId } }),
+      this.techProfileRepo.findOne({ where: { userId } }),
+    ]);
+
+    return apps.map((app) => {
+      let liveStatus: string = app.status;
+      if (
+        app.requestedRole === ProfessionalRole.PARKING_OPERATOR &&
+        parkingOp?.verificationStatus === VerificationStatus.SUSPENDED
+      ) {
+        liveStatus = 'SUSPENDED';
+      } else if (
+        app.requestedRole === ProfessionalRole.DRIVER &&
+        driverProfile?.verificationStatus === VerificationStatus.SUSPENDED
+      ) {
+        liveStatus = 'SUSPENDED';
+      } else if (
+        app.requestedRole === ProfessionalRole.TECHNICIAN &&
+        techProfile?.verificationStatus === VerificationStatus.SUSPENDED
+      ) {
+        liveStatus = 'SUSPENDED';
+      }
+
+      return {
+        ...app,
+        status: liveStatus,
+      };
     });
   }
 

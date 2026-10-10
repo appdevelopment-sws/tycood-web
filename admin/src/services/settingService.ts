@@ -133,6 +133,13 @@ const DEFAULT_SETTINGS_ITEMS: SettingItem[] = [
     isSecret: false,
   },
   {
+    key: "PARKING_COMMISSION_PERCENTAGE",
+    value: "20",
+    category: "GENERAL",
+    description: "Parking admin commission & prepaid advance booking percentage (%)",
+    isSecret: false,
+  },
+  {
     key: "AUTO_DISPATCH_RADIUS_KM",
     value: "5",
     category: "GENERAL",

@@ -130,4 +130,17 @@ export class CreateParkingLocationDto {
   @IsArray()
   @IsString({ each: true })
   amenities?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Dynamic extra add-ons offered with provider pricing',
+  })
+  @IsOptional()
+  @IsArray()
+  addonServices?: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    price: number;
+    icon?: string;
+  }>;
 }

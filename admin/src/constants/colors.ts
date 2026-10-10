@@ -50,6 +50,24 @@ export const STATUS_COLORS: Record<
     border: "border-orange-200 dark:border-orange-800",
     label: "Maintenance",
   },
+  VERIFIED: {
+    bg: "bg-emerald-50 dark:bg-emerald-950/40",
+    text: "text-emerald-700 dark:text-emerald-400",
+    border: "border-emerald-200 dark:border-emerald-800",
+    label: "Verified & Active",
+  },
+  SUSPENDED: {
+    bg: "bg-rose-50 dark:bg-rose-950/40",
+    text: "text-rose-700 dark:text-rose-400",
+    border: "border-rose-200 dark:border-rose-800",
+    label: "Disabled / Suspended",
+  },
+  REJECTED: {
+    bg: "bg-red-50 dark:bg-red-950/40",
+    text: "text-red-700 dark:text-red-400",
+    border: "border-red-200 dark:border-red-800",
+    label: "Rejected",
+  },
 
   // Booking & Trip Statuses
   CONFIRMED: {

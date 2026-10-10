@@ -283,33 +283,37 @@ export class ParkingService {
     }
 
     const platformFee = 15;
-    const addonsPrice = 0; // Calculated dynamically if selected
+    let addonsPrice = 0;
+    if (dto.selectedAddonIds && dto.selectedAddonIds.length > 0 && Array.isArray(location.addonServices)) {
+      for (const addonId of dto.selectedAddonIds) {
+        const found = location.addonServices.find((a: any) => a.id === addonId);
+        if (found) {
+          addonsPrice += Number(found.price) || 0;
+        }
+      }
+    }
     const totalAmount = basePrice + addonsPrice + platformFee;
 
-    // Fetch Admin Commission and Advance settings
-    const advanceType = await this.getSetting('PARKING_ADVANCE_TYPE', 'PERCENTAGE');
-    const advanceVal = parseFloat(await this.getSetting('PARKING_ADVANCE_VALUE', '25')) || 25;
-    const minAdvance = parseFloat(await this.getSetting('PARKING_MIN_ADVANCE_AMOUNT', '20')) || 20;
-    const maxAdvance = parseFloat(await this.getSetting('PARKING_MAX_ADVANCE_AMOUNT', '500')) || 500;
+    // Unified parking admin commission & prepaid advance percentage (single setting like driver rides)
+    const parkingCommissionPercentage =
+      parseFloat(
+        await this.getSetting(
+          'PARKING_COMMISSION_PERCENTAGE',
+          await this.getSetting('PARKING_ADVANCE_VALUE', '20'),
+        ),
+      ) || 20;
+
+    const advanceAmount = Math.round((totalAmount * parkingCommissionPercentage) / 100);
+    const remainingAmount = totalAmount - advanceAmount;
+
+    // Commission snapshot
+    const commissionRate = parkingCommissionPercentage;
+    const commissionAmount = Math.round((basePrice * commissionRate) / 100);
+
     const cancellationPolicy = await this.getSetting(
       'PARKING_CANCELLATION_POLICY',
       'Free cancellation up to 1 hour before scheduled check-in. 50% refund within 1 hour. No refund on no-show.',
     );
-
-    let advanceAmount = 0;
-    if (advanceType === 'FIXED') {
-      advanceAmount = advanceVal;
-    } else {
-      advanceAmount = Math.round((totalAmount * advanceVal) / 100);
-    }
-    advanceAmount = Math.max(minAdvance, Math.min(advanceAmount, maxAdvance));
-    advanceAmount = Math.min(advanceAmount, totalAmount);
-
-    const remainingAmount = totalAmount - advanceAmount;
-
-    // Commission snapshot
-    const commissionRate = parseFloat(await this.getSetting('PARKING_COMMISSION_RATE', '15')) || 15;
-    const commissionAmount = Math.round((basePrice * commissionRate) / 100);
 
     return {
       locationId: location.id,
@@ -700,6 +704,11 @@ export class ParkingService {
     if (!isAdmin && location.operator.userId !== user.userId) {
       throw new ForbiddenException('Unauthorized to operate gate for this facility');
     }
+    if (!isAdmin && location.operator.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenException(
+        'Your parking operator account has been disabled/suspended by administrator. Gate operations are blocked.',
+      );
+    }
 
     const qb = this.bookingRepo
       .createQueryBuilder('b')
@@ -764,6 +773,11 @@ export class ParkingService {
         user.roles.includes(BusinessRole.SUPER_ADMIN);
       if (!isAdmin && location.operator.userId !== user.userId) {
         throw new ForbiddenException('Unauthorized to record vehicle exit');
+      }
+      if (!isAdmin && location.operator.verificationStatus === VerificationStatus.SUSPENDED) {
+        throw new ForbiddenException(
+          'Your parking operator account has been disabled/suspended by administrator. Gate operations are blocked.',
+        );
       }
 
       const booking = await manager.findOne(ParkingBooking, {
@@ -853,6 +867,11 @@ export class ParkingService {
         user.roles.includes(BusinessRole.SUPER_ADMIN);
       if (!isAdmin && location.operator.userId !== user.userId) {
         throw new ForbiddenException('Unauthorized to check in walk-in vehicle');
+      }
+      if (!isAdmin && location.operator.verificationStatus === VerificationStatus.SUSPENDED) {
+        throw new ForbiddenException(
+          'Your parking operator account has been disabled/suspended by administrator. Gate operations are blocked.',
+        );
       }
 
       const isBike = dto.vehicleType === ParkingVehicleType.BIKE;
@@ -1224,5 +1243,105 @@ export class ParkingService {
 
       return saved;
     });
+  }
+
+  async toggleOperatorStatus(id: string, adminUserId: string): Promise<ParkingOperator> {
+    return this.dataSource.transaction(async (manager) => {
+      const operator = await manager.findOne(ParkingOperator, {
+        where: { id },
+        relations: { locations: true },
+      });
+      if (!operator) {
+        throw new NotFoundException(`Parking operator ${id} not found`);
+      }
+
+      const isCurrentlyVerified = operator.verificationStatus === VerificationStatus.VERIFIED;
+      operator.verificationStatus = isCurrentlyVerified
+        ? VerificationStatus.SUSPENDED
+        : VerificationStatus.VERIFIED;
+
+      const newLocationStatus = isCurrentlyVerified
+        ? ParkingLocationStatus.INACTIVE
+        : ParkingLocationStatus.ACTIVE;
+
+      if (operator.locations && operator.locations.length > 0) {
+        for (const loc of operator.locations) {
+          loc.status = newLocationStatus;
+          await manager.save(loc);
+        }
+      }
+
+      // Sync user role and professional application if operator has linked user account
+      if (operator.userId) {
+        const parkingRole = await manager.findOne(Role, {
+          where: { name: ProfessionalRole.PARKING_OPERATOR },
+        });
+        if (parkingRole) {
+          const userRole = await manager.findOne(UserRole, {
+            where: { userId: operator.userId, roleId: parkingRole.id },
+          });
+          if (userRole) {
+            userRole.status = isCurrentlyVerified
+              ? RoleAssignmentStatus.SUSPENDED
+              : RoleAssignmentStatus.ACTIVE;
+            await manager.save(userRole);
+          }
+        }
+
+        const application = await manager.findOne(ProfessionalApplication, {
+          where: {
+            userId: operator.userId,
+            requestedRole: ProfessionalRole.PARKING_OPERATOR,
+          },
+          order: { submittedAt: 'DESC' },
+        });
+        if (application) {
+          application.status = isCurrentlyVerified
+            ? ApplicationStatus.REJECTED
+            : ApplicationStatus.APPROVED;
+          application.rejectionReason = isCurrentlyVerified
+            ? 'OPERATOR_SUSPENDED: Facility has been disabled by administrator'
+            : null;
+          await manager.save(application);
+        }
+      }
+
+      return manager.save(operator);
+    });
+  }
+
+  async deleteOperator(id: string): Promise<{ success: boolean; message: string }> {
+    return this.dataSource.transaction(async (manager) => {
+      const operator = await manager.findOne(ParkingOperator, {
+        where: { id },
+        relations: { locations: true },
+      });
+      if (!operator) {
+        throw new NotFoundException(`Parking operator ${id} not found`);
+      }
+      await manager.remove(operator);
+      return { success: true, message: 'Parking operator and facilities deleted successfully' };
+    });
+  }
+
+  async toggleLocationStatus(id: string): Promise<ParkingLocation> {
+    const location = await this.locationRepo.findOne({ where: { id } });
+    if (!location) {
+      throw new NotFoundException(`Parking location ${id} not found`);
+    }
+    location.status =
+      location.status === ParkingLocationStatus.ACTIVE
+        ? ParkingLocationStatus.INACTIVE
+        : ParkingLocationStatus.ACTIVE;
+    return this.locationRepo.save(location);
+  }
+
+  async deleteLocation(id: string): Promise<{ success: boolean; message: string }> {
+    const location = await this.locationRepo.findOne({ where: { id } });
+    if (!location) {
+      throw new NotFoundException(`Parking location ${id} not found`);
+    }
+    await this.locationRepo.remove(location);
+    return { success: true, message: 'Parking location deleted successfully' };
   }
 }
