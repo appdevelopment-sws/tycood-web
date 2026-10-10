@@ -131,6 +131,22 @@ export class ApplyParkingDto {
   @IsString()
   operatingHours?: string;
 
+  @ApiPropertyOptional({
+    example: {
+      monday: {
+        isOpen: true,
+        is24Hours: false,
+        slots: [
+          { openTime: '15:00', closeTime: '18:00' },
+          { openTime: '22:00', closeTime: '00:00' },
+        ],
+      },
+    },
+    description: 'Detailed weekly schedule by day with multiple shifts/slots',
+  })
+  @IsOptional()
+  operatingSchedule?: Record<string, any>;
+
   @ApiPropertyOptional({ example: 30.0 })
   @IsOptional()
   @IsNumber()

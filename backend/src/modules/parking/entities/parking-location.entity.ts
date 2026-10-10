@@ -69,8 +69,11 @@ export class ParkingLocation {
   @Column({ name: 'is_open_24x7', type: 'boolean', default: true })
   isOpen24x7: boolean;
 
-  @Column({ name: 'operating_hours', length: 100, default: '24x7 Open (Mon - Sun)' })
+  @Column({ name: 'operating_hours', type: 'text', default: '24x7 Open (Mon - Sun)' })
   operatingHours: string;
+
+  @Column({ name: 'operating_schedule', type: 'jsonb', nullable: true })
+  operatingSchedule: Record<string, any> | null;
 
   @Column({ name: 'opening_time', type: 'varchar', length: 10, nullable: true })
   openingTime: string | null;

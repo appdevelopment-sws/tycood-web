@@ -281,6 +281,7 @@ export class ApplicationsService {
         availableBikeSlots: dto.bikeSlotsTotal || 35,
         isOpen24x7: dto.isOpen24x7 ?? true,
         operatingHours: dto.operatingHours || '24x7 Open (Mon - Sun)',
+        operatingSchedule: dto.operatingSchedule ?? null,
         carHourlyRate: dto.carHourlyRate || 30.0,
         carDailyRate: dto.carDailyRate || 250.0,
         bikeHourlyRate: dto.bikeHourlyRate || 15.0,
