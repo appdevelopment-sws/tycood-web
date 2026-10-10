@@ -28,6 +28,10 @@ import {
   PaymentStatus,
 } from '../../common/enums/index.js';
 
+import { ParkingOperator } from '../../modules/parking/entities/parking-operator.entity.js';
+import { ParkingLocation } from '../../modules/parking/entities/parking-location.entity.js';
+import { ParkingLocationStatus } from '../../common/enums/parking-status.enum.js';
+
 @Injectable()
 export class InitialSeedService implements OnApplicationBootstrap {
   private readonly logger = new Logger(InitialSeedService.name);
@@ -51,6 +55,10 @@ export class InitialSeedService implements OnApplicationBootstrap {
     private readonly taxRepo: Repository<Tax>,
     @InjectRepository(SystemSetting)
     private readonly settingRepo: Repository<SystemSetting>,
+    @InjectRepository(ParkingOperator)
+    private readonly operatorRepo: Repository<ParkingOperator>,
+    @InjectRepository(ParkingLocation)
+    private readonly locationRepo: Repository<ParkingLocation>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -63,6 +71,7 @@ export class InitialSeedService implements OnApplicationBootstrap {
     await this.seedAdmin();
     await this.seedFleetAndBookings();
     await this.seedTaxesAndSettings();
+    await this.seedParkingLocations();
   }
 
   private async seedRoles() {
@@ -953,6 +962,70 @@ export class InitialSeedService implements OnApplicationBootstrap {
             'Official customer support email shown in rider receipt & app',
           isSecret: false,
         },
+        // Parking Platform Configurations
+        {
+          key: 'PARKING_BOOKING_ENABLED',
+          value: 'true',
+          category: 'PARKING',
+          description: 'Enable or disable digital parking bookings across platform',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_COMMISSION_TYPE',
+          value: 'PERCENTAGE',
+          category: 'PARKING',
+          description: 'Parking commission calculation method (PERCENTAGE / FIXED)',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_COMMISSION_RATE',
+          value: '15',
+          category: 'PARKING',
+          description: 'Parking commission percentage or fixed fee',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_ADVANCE_TYPE',
+          value: 'PERCENTAGE',
+          category: 'PARKING',
+          description: 'Prepaid advance collection type (PERCENTAGE / FIXED)',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_ADVANCE_VALUE',
+          value: '25',
+          category: 'PARKING',
+          description: 'Prepaid advance percentage or fixed amount',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_MIN_ADVANCE_AMOUNT',
+          value: '20',
+          category: 'PARKING',
+          description: 'Minimum advance cap in INR',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_MAX_ADVANCE_AMOUNT',
+          value: '500',
+          category: 'PARKING',
+          description: 'Maximum advance cap in INR',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_GRACE_PERIOD_MINS',
+          value: '15',
+          category: 'PARKING',
+          description: 'Customer arrival grace period in minutes',
+          isSecret: false,
+        },
+        {
+          key: 'PARKING_CANCELLATION_POLICY',
+          value: 'Free cancellation up to 1 hour before scheduled check-in. 50% refund within 1 hour. No refund on no-show.',
+          category: 'PARKING',
+          description: 'Customer cancellation terms & refund schedule',
+          isSecret: false,
+        },
       ];
 
       for (const s of defaultSettings) {
@@ -960,5 +1033,161 @@ export class InitialSeedService implements OnApplicationBootstrap {
       }
       this.logger.log('Seeded default system settings and key placeholders.');
     }
+  }
+
+  private async seedParkingLocations() {
+    const existingCount = await this.locationRepo.count();
+    if (existingCount > 0) return;
+
+    // 1. Create or find parking operator user
+    let operatorUser = await this.userRepo.findOne({
+      where: { email: 'parking@cabbooking.com' },
+    });
+    if (!operatorUser) {
+      const passwordHash = await bcrypt.hash('Parking@1234', 10);
+      operatorUser = this.userRepo.create({
+        name: 'Patna Smart Parking Management',
+        email: 'parking@cabbooking.com',
+        phone: '+919876543230',
+        passwordHash,
+        status: 'ACTIVE',
+        isActive: true,
+      });
+      await this.userRepo.save(operatorUser);
+
+      const parkingRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.PARKING_OPERATOR },
+      });
+      if (parkingRole) {
+        await this.userRoleRepo.save(
+          this.userRoleRepo.create({
+            userId: operatorUser.id,
+            roleId: parkingRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+          }),
+        );
+      }
+    }
+
+    // 2. Create verified parking operator profile
+    let operator = await this.operatorRepo.findOne({
+      where: { userId: operatorUser.id },
+    });
+    if (!operator) {
+      operator = this.operatorRepo.create({
+        userId: operatorUser.id,
+        businessType: 'Commercial Operator',
+        facilityName: 'Patna City Smart Parks Ltd',
+        ownerName: 'Sunil Kumar Verma',
+        businessPhone: '+919876543230',
+        businessEmail: 'parking@cabbooking.com',
+        gstin: '10AAACP1234M1Z5',
+        verificationStatus: VerificationStatus.VERIFIED,
+        ownershipProofUploaded: true,
+        tradeLicenseUploaded: true,
+        facilityPhotosUploaded: true,
+      });
+      await this.operatorRepo.save(operator);
+    }
+
+    // 3. Seed 3 verified parking locations matching user app coordinates
+    const locationsToSeed = [
+      {
+        name: 'Bailey Central Covered Parking',
+        address: 'Bailey Road, Opp. Patna High Court, Patna, Bihar 800001',
+        landmark: 'Near Patna High Court & Secretariat',
+        city: 'Patna',
+        pincode: '800001',
+        facilityStructure: 'Covered Basement & Ground',
+        latitude: 25.6120,
+        longitude: 85.1180,
+        capacity: 100,
+        carSlotsTotal: 60,
+        bikeSlotsTotal: 40,
+        evChargingPoints: 4,
+        availableSpaces: 70,
+        availableCarSlots: 42,
+        availableBikeSlots: 28,
+        isOpen24x7: true,
+        operatingHours: '24 Hours Open (Mon - Sun)',
+        carHourlyRate: 30,
+        carDailyRate: 250,
+        bikeHourlyRate: 15,
+        amenities: [
+          'CCTV Surveillance',
+          '24x7 Security Guard',
+          'Covered Basement',
+          'EV Fast Charger (60kW)',
+          'Valet Available',
+        ],
+        status: ParkingLocationStatus.ACTIVE,
+        operatorId: operator.id,
+      },
+      {
+        name: 'Patna Junction Multi-Level Parking',
+        address: 'Station Road, Railway South Complex, Patna, Bihar 800001',
+        landmark: 'Platform 1 Main Exit, Patna Junction',
+        city: 'Patna',
+        pincode: '800001',
+        facilityStructure: 'Multi-level Automated Structure',
+        latitude: 25.6015,
+        longitude: 85.1370,
+        capacity: 220,
+        carSlotsTotal: 120,
+        bikeSlotsTotal: 100,
+        evChargingPoints: 8,
+        availableSpaces: 150,
+        availableCarSlots: 85,
+        availableBikeSlots: 65,
+        isOpen24x7: true,
+        operatingHours: '24 Hours Open (Mon - Sun)',
+        carHourlyRate: 40,
+        carDailyRate: 300,
+        bikeHourlyRate: 20,
+        amenities: [
+          'Automated Barrier Gate',
+          'CCTV Surveillance',
+          'Fastag / QR Auto-Pay',
+          'Elevator Access',
+        ],
+        status: ParkingLocationStatus.ACTIVE,
+        operatorId: operator.id,
+      },
+      {
+        name: 'City Centre & Forum Hub Parking',
+        address: 'Fraser Road, Dak Bungalow Chauraha, Patna, Bihar 800001',
+        landmark: 'Opposite Maurya Lok Complex & Forum Mall',
+        city: 'Patna',
+        pincode: '800001',
+        facilityStructure: 'Basement Levels B1 & B2',
+        latitude: 25.6150,
+        longitude: 85.1410,
+        capacity: 130,
+        carSlotsTotal: 80,
+        bikeSlotsTotal: 50,
+        evChargingPoints: 6,
+        availableSpaces: 90,
+        availableCarSlots: 55,
+        availableBikeSlots: 35,
+        isOpen24x7: false,
+        operatingHours: '08:00 AM - 11:30 PM (Mon - Sun)',
+        carHourlyRate: 35,
+        carDailyRate: 260,
+        bikeHourlyRate: 15,
+        amenities: [
+          'Underground Covered',
+          'Car Wash Bay',
+          'EV Fast Charging',
+          'CCTV Surveillance',
+        ],
+        status: ParkingLocationStatus.ACTIVE,
+        operatorId: operator.id,
+      },
+    ];
+
+    for (const loc of locationsToSeed) {
+      await this.locationRepo.save(this.locationRepo.create(loc));
+    }
+    this.logger.log('Seeded commercial parking operator and 3 active facilities.');
   }
 }

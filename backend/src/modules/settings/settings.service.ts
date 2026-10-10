@@ -276,6 +276,70 @@ export class SettingsService implements OnModuleInit {
         description: 'Emergency national or city SOS police helpline dialed on SOS tap',
         isSecret: false,
       },
+      // Parking platform defaults
+      {
+        key: 'PARKING_BOOKING_ENABLED',
+        value: 'true',
+        category: 'PARKING',
+        description: 'Enable or disable digital parking bookings across platform',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_COMMISSION_TYPE',
+        value: 'PERCENTAGE',
+        category: 'PARKING',
+        description: 'Parking commission calculation method (PERCENTAGE / FIXED)',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_COMMISSION_RATE',
+        value: '15',
+        category: 'PARKING',
+        description: 'Parking commission percentage or fixed fee',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_ADVANCE_TYPE',
+        value: 'PERCENTAGE',
+        category: 'PARKING',
+        description: 'Prepaid advance collection type (PERCENTAGE / FIXED)',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_ADVANCE_VALUE',
+        value: '25',
+        category: 'PARKING',
+        description: 'Prepaid advance percentage or fixed amount',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_MIN_ADVANCE_AMOUNT',
+        value: '20',
+        category: 'PARKING',
+        description: 'Minimum advance cap in INR',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_MAX_ADVANCE_AMOUNT',
+        value: '500',
+        category: 'PARKING',
+        description: 'Maximum advance cap in INR',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_GRACE_PERIOD_MINS',
+        value: '15',
+        category: 'PARKING',
+        description: 'Customer arrival grace period in minutes',
+        isSecret: false,
+      },
+      {
+        key: 'PARKING_CANCELLATION_POLICY',
+        value: 'Free cancellation up to 1 hour before scheduled check-in. 50% refund within 1 hour. No refund on no-show.',
+        category: 'PARKING',
+        description: 'Customer cancellation terms & refund schedule',
+        isSecret: false,
+      },
     ];
 
     for (const item of defaults) {

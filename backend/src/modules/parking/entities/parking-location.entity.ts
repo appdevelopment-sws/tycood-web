@@ -5,11 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { ParkingOperator } from './parking-operator.entity';
 import { ParkingLocationStatus } from '../../../common/enums/parking-status.enum';
+import { ParkingBooking } from './parking-booking.entity';
 
 @Entity('parking_locations')
 export class ParkingLocation {
@@ -140,4 +142,7 @@ export class ParkingLocation {
   @ManyToOne(() => ParkingOperator, (op) => op.locations, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'operator_id' })
   operator: ParkingOperator;
+
+  @OneToMany(() => ParkingBooking, (booking) => booking.location)
+  bookings: ParkingBooking[];
 }

@@ -10,6 +10,8 @@ import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity
 import { Booking } from '../modules/bookings/entities/booking.entity';
 import { Tax } from '../modules/taxes/entities/tax.entity.js';
 import { SystemSetting } from '../modules/settings/entities/system-setting.entity.js';
+import { ParkingOperator } from '../modules/parking/entities/parking-operator.entity';
+import { ParkingLocation } from '../modules/parking/entities/parking-location.entity';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -27,6 +29,8 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       Booking,
       Tax,
       SystemSetting,
+      ParkingOperator,
+      ParkingLocation,
     ]),
   ],
   providers: [InitialSeedService],

@@ -86,4 +86,83 @@ export const parkingAdminService = {
       body: JSON.stringify({ rejectionReason }),
     })
   },
+
+  getParkingSettings: async (): Promise<ParkingSettings> => {
+    return apiClient<ParkingSettings>("/parking/admin/settings")
+  },
+
+  updateParkingSettings: async (settings: Partial<ParkingSettings>): Promise<any> => {
+    return apiClient<any>("/parking/admin/settings", {
+      method: "PATCH",
+      body: JSON.stringify(settings),
+    })
+  },
+
+  getAdminBookings: async (filters?: {
+    status?: string
+    search?: string
+    page?: number
+    limit?: number
+  }): Promise<{ data: ParkingBookingAdminItem[]; total: number }> => {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append("status", filters.status)
+    if (filters?.search) params.append("search", filters.search)
+    if (filters?.page) params.append("page", String(filters.page))
+    if (filters?.limit) params.append("limit", String(filters.limit))
+
+    const queryString = params.toString()
+    const url = `/parking/admin/bookings${queryString ? `?${queryString}` : ""}`
+    return apiClient<{ data: ParkingBookingAdminItem[]; total: number }>(url)
+  },
+
+  getReconciliationReport: async (): Promise<any> => {
+    return apiClient<any>("/parking/admin/reports/reconciliation")
+  },
+}
+
+export interface ParkingSettings {
+  enabled: boolean
+  commissionType: "PERCENTAGE" | "FIXED"
+  commissionValue: number
+  advancePaymentType: "PERCENTAGE" | "FIXED"
+  advancePaymentValue: number
+  minAdvanceAmount: number
+  maxAdvanceAmount: number
+  cancellationWindowHours: number
+  refundDeductionPercentage: number
+  gracePeriodMinutes: number
+  overtimeHourlyRateMultiplier: number
+}
+
+export interface ParkingBookingAdminItem {
+  id: string
+  bookingNumber: string
+  vehicleType: string
+  vehicleNumber: string
+  allocatedFloor: string
+  allocatedBay: string
+  entryDateTime: string
+  exitDateTime: string
+  durationHours: number
+  totalAmount: number
+  advanceAmount: number
+  remainingAmount: number
+  platformCommission: number
+  operatorPayout: number
+  status: string
+  paymentStatus: string
+  refundStatus: string
+  paymentMethod: string
+  location?: {
+    id: string
+    name: string
+    city: string
+    address: string
+  }
+  user?: {
+    id: string
+    name: string
+    phone: string
+  }
+  createdAt: string
 }
