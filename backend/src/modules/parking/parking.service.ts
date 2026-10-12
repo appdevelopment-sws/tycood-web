@@ -718,7 +718,25 @@ export class ParkingService {
     if (dto.gatePinOtp) {
       qb.andWhere('b.gatePinOtp = :pin', { pin: dto.gatePinOtp.trim() });
     } else if (dto.qrCodePayload) {
-      qb.andWhere('b.qrCodePayload = :qr', { qr: dto.qrCodePayload.trim() });
+      const raw = dto.qrCodePayload.trim();
+      let matched = false;
+      try {
+        if (raw.startsWith('{') && raw.endsWith('}')) {
+          const parsed = JSON.parse(raw);
+          if (parsed.bookingNumber) {
+            qb.andWhere('b.bookingNumber = :bn', { bn: String(parsed.bookingNumber).trim() });
+            matched = true;
+          } else if (parsed.pin) {
+            qb.andWhere('b.gatePinOtp = :pin', { pin: String(parsed.pin).trim() });
+            matched = true;
+          }
+        }
+      } catch (_) {}
+      if (!matched) {
+        qb.andWhere('(b.qrCodePayload = :qr OR b.bookingNumber = :qr OR b.gatePinOtp = :qr)', {
+          qr: raw,
+        });
+      }
     } else if (dto.bookingNumber) {
       qb.andWhere('b.bookingNumber = :bn', { bn: dto.bookingNumber.trim() });
     } else if (dto.vehicleNumber) {
@@ -1169,6 +1187,13 @@ export class ParkingService {
       operator.verificationStatus = VerificationStatus.VERIFIED;
       const saved = await manager.save(operator);
 
+      // Automatically activate all parking locations associated with this verified operator
+      await manager.update(
+        ParkingLocation,
+        { operatorId: operator.id },
+        { status: ParkingLocationStatus.ACTIVE },
+      );
+
       const parkingRole = await manager.findOne(Role, {
         where: { name: BusinessRole.PARKING_OPERATOR },
       });
@@ -1224,6 +1249,13 @@ export class ParkingService {
 
       operator.verificationStatus = VerificationStatus.REJECTED;
       const saved = await manager.save(operator);
+
+      // Automatically deactivate all parking locations of rejected operator
+      await manager.update(
+        ParkingLocation,
+        { operatorId: operator.id },
+        { status: ParkingLocationStatus.INACTIVE },
+      );
 
       const application = await manager.findOne(ProfessionalApplication, {
         where: {

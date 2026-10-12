@@ -41,10 +41,28 @@ export class ParkingLocation {
   @Column({ name: 'facility_structure', type: 'varchar', length: 100, default: 'Covered Basement & Ground' })
   facilityStructure: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 7,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value != null ? parseFloat(value) : null),
+    },
+  })
   latitude: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 7,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value != null ? parseFloat(value) : null),
+    },
+  })
   longitude: number | null;
 
   @Column({ type: 'int', default: 0 })
