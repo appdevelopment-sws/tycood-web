@@ -9,3 +9,4 @@ export * from './booking-service-type.enum.js';
 export * from './booking-status.enum.js';
 export * from './booking-trip-type.enum.js';
 export * from './payment-status.enum.js';
+export * from './review.enums.js';

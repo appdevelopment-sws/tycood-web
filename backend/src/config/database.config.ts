@@ -13,6 +13,7 @@ import { ParkingBooking } from '../modules/parking/entities/parking-booking.enti
 import { Booking } from '../modules/bookings/entities/booking.entity';
 import { Tax } from '../modules/taxes/entities/tax.entity.js';
 import { SystemSetting } from '../modules/settings/entities/system-setting.entity.js';
+import { Review } from '../modules/reviews/entities/review.entity.js';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -36,6 +37,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     Booking,
     Tax,
     SystemSetting,
+    Review,
   ],
   synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging:

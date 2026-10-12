@@ -1,0 +1,22 @@
+export enum ReviewServiceType {
+  CAB = 'CAB',
+  PARKING = 'PARKING',
+  TECHNICIAN = 'TECHNICIAN',
+  DELIVERY = 'DELIVERY',
+  GENERAL = 'GENERAL',
+}
+
+export enum ReviewRole {
+  DRIVER = 'DRIVER',
+  RIDER = 'RIDER',
+  OPERATOR = 'OPERATOR',
+  CUSTOMER = 'CUSTOMER',
+  TECHNICIAN = 'TECHNICIAN',
+}
+
+export enum ReviewTargetType {
+  USER = 'USER',
+  VEHICLE = 'VEHICLE',
+  PARKING_LOCATION = 'PARKING_LOCATION',
+  SERVICE = 'SERVICE',
+}

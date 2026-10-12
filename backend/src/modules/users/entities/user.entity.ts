@@ -109,6 +109,22 @@ export class User {
   @Column({ name: 'last_location_updated_at', type: 'timestamptz', nullable: true })
   lastLocationUpdatedAt: Date | null;
 
+  @Column({
+    name: 'passenger_rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 5.0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value) || 5.0,
+    },
+  })
+  passengerRating: number;
+
+  @Column({ name: 'passenger_reviews_count', type: 'int', default: 0 })
+  passengerReviewsCount: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
@@ -136,4 +152,10 @@ export class User {
 
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];
+
+  @OneToMany('Review', 'reviewer')
+  givenReviews: any[];
+
+  @OneToMany('Review', 'targetUser')
+  receivedReviews: any[];
 }
