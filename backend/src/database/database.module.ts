@@ -15,6 +15,11 @@ import { ParkingLocation } from '../modules/parking/entities/parking-location.en
 import { ParkingBooking } from '../modules/parking/entities/parking-booking.entity';
 import { Review } from '../modules/reviews/entities/review.entity.js';
 import { Transaction } from '../modules/transactions/entities/transaction.entity';
+import { TechnicianProfile } from '../modules/technicians/entities/technician-profile.entity.js';
+import { TechnicianCategory } from '../modules/technicians/entities/technician-category.entity.js';
+import { TechnicianServiceCatalogItem } from '../modules/technicians/entities/technician-service-catalog-item.entity.js';
+import { TechnicianProviderService } from '../modules/technicians/entities/technician-provider-service.entity.js';
+import { TechnicianBooking } from '../modules/technicians/entities/technician-booking.entity.js';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -37,6 +42,11 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       ParkingBooking,
       Review,
       Transaction,
+      TechnicianProfile,
+      TechnicianCategory,
+      TechnicianServiceCatalogItem,
+      TechnicianProviderService,
+      TechnicianBooking,
     ]),
   ],
   providers: [InitialSeedService],

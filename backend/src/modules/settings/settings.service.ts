@@ -298,6 +298,14 @@ export class SettingsService implements OnModuleInit {
         description: 'Parking admin commission and prepaid booking advance percentage (%) required upfront',
         isSecret: false,
       },
+      // Technician / Mechanic platform defaults
+      {
+        key: 'TECHNICIAN_COMMISSION_PERCENTAGE',
+        value: '20',
+        category: 'GENERAL',
+        description: 'Technician/mechanic admin commission and prepaid booking advance percentage (%) required upfront',
+        isSecret: false,
+      },
       {
         key: 'PARKING_BOOKING_ENABLED',
         value: 'true',

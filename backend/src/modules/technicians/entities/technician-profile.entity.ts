@@ -5,12 +5,15 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { VerificationStatus } from '../../../common/enums/verification-status.enum';
-import { AvailabilityStatus } from '../../../common/enums/availability-status.enum';
+import { User } from '../../users/entities/user.entity.js';
+import { VerificationStatus } from '../../../common/enums/verification-status.enum.js';
+import { AvailabilityStatus } from '../../../common/enums/availability-status.enum.js';
+import { TechnicianProviderService } from './technician-provider-service.entity.js';
+import { TechnicianBooking } from './technician-booking.entity.js';
 
 @Entity('technician_profiles')
 export class TechnicianProfile {
@@ -146,4 +149,13 @@ export class TechnicianProfile {
   @OneToOne(() => User, (user) => user.technicianProfile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @OneToMany(
+    () => TechnicianProviderService,
+    (providerService) => providerService.technicianProfile,
+  )
+  providerServices: TechnicianProviderService[];
+
+  @OneToMany(() => TechnicianBooking, (booking) => booking.technicianProfile)
+  bookings: TechnicianBooking[];
 }

@@ -3,7 +3,11 @@ import { User } from '../modules/users/entities/user.entity';
 import { Role } from '../modules/users/entities/role.entity';
 import { UserRole } from '../modules/users/entities/user-role.entity';
 import { ProfessionalApplication } from '../modules/applications/entities/professional-application.entity';
-import { TechnicianProfile } from '../modules/technicians/entities/technician-profile.entity';
+import { TechnicianProfile } from '../modules/technicians/entities/technician-profile.entity.js';
+import { TechnicianCategory } from '../modules/technicians/entities/technician-category.entity.js';
+import { TechnicianServiceCatalogItem } from '../modules/technicians/entities/technician-service-catalog-item.entity.js';
+import { TechnicianProviderService } from '../modules/technicians/entities/technician-provider-service.entity.js';
+import { TechnicianBooking } from '../modules/technicians/entities/technician-booking.entity.js';
 import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 import { Vehicle } from '../modules/drivers/entities/vehicle.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
@@ -29,6 +33,10 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     UserRole,
     ProfessionalApplication,
     TechnicianProfile,
+    TechnicianCategory,
+    TechnicianServiceCatalogItem,
+    TechnicianProviderService,
+    TechnicianBooking,
     DriverProfile,
     Vehicle,
     DriverVehicle,

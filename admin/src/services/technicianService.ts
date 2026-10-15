@@ -103,4 +103,115 @@ export const technicianService = {
       body: JSON.stringify({ rejectionReason }),
     })
   },
+
+  // Categories & Catalog Services
+  getCategories: async (includeInactive = true): Promise<TechnicianCategory[]> => {
+    return apiClient<TechnicianCategory[]>(
+      `/technicians/categories?includeInactive=${includeInactive}`
+    )
+  },
+
+  createCategory: async (data: Partial<TechnicianCategory>): Promise<TechnicianCategory> => {
+    return apiClient<TechnicianCategory>(`/technicians/categories`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+
+  updateCategory: async (
+    id: string,
+    data: Partial<TechnicianCategory>
+  ): Promise<TechnicianCategory> => {
+    return apiClient<TechnicianCategory>(`/technicians/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  },
+
+  deleteCategory: async (id: string): Promise<any> => {
+    return apiClient<any>(`/technicians/categories/${id}`, {
+      method: "DELETE",
+    })
+  },
+
+  createServiceItem: async (
+    data: Partial<TechnicianServiceCatalogItem>
+  ): Promise<TechnicianServiceCatalogItem> => {
+    return apiClient<TechnicianServiceCatalogItem>(
+      `/technicians/categories/services`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    )
+  },
+
+  updateServiceItem: async (
+    id: string,
+    data: Partial<TechnicianServiceCatalogItem>
+  ): Promise<TechnicianServiceCatalogItem> => {
+    return apiClient<TechnicianServiceCatalogItem>(
+      `/technicians/categories/services/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    )
+  },
+
+  deleteServiceItem: async (id: string): Promise<any> => {
+    return apiClient<any>(`/technicians/categories/services/${id}`, {
+      method: "DELETE",
+    })
+  },
+
+  // Technician Bookings
+  getBookings: async (params?: Record<string, any>): Promise<any> => {
+    const qs = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+          qs.append(k, String(v))
+        }
+      })
+    }
+    const url = `/technicians/bookings${qs.toString() ? `?${qs.toString()}` : ""}`
+    return apiClient<any>(url)
+  },
+
+  getBookingById: async (id: string): Promise<any> => {
+    return apiClient<any>(`/technicians/bookings/${id}`)
+  },
 }
+
+export interface TechnicianCategory {
+  id: string
+  name: string
+  slug?: string
+  description?: string
+  icon?: string
+  imageUrl?: string
+  isOther?: boolean
+  displayOrder?: number
+  isActive?: boolean
+  services?: TechnicianServiceCatalogItem[]
+  createdAt?: string
+  updatedAt?: string
+  viewMode?: boolean
+}
+
+export interface TechnicianServiceCatalogItem {
+  id: string
+  categoryId: string
+  name: string
+  slug?: string
+  description?: string
+  estimatedDurationMinutes?: number
+  isInspectionRequired?: boolean
+  displayOrder?: number
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
+  viewMode?: boolean
+}
+
