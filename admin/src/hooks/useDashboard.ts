@@ -1,39 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
-import { dashboardService } from '../services/dashboardService';
-import type { DashboardOverviewData } from '../services/dashboardService';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService, INITIAL_EMPTY_DASHBOARD_DATA } from '../services/dashboardService';
+import { queryKeys } from '../lib/queryKeys';
 
-export function useDashboard() {
-  const [data, setData] = useState<DashboardOverviewData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export function useDashboard(timeRange: 'today' | '7d' | '30d' = '7d') {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.dashboard.overview(timeRange),
+    queryFn: () => dashboardService.getOverview(timeRange),
+    staleTime: 5000,
+  });
 
-  const fetchDashboard = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const overview = await dashboardService.getOverview();
-      setData(overview);
-    } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : 'Failed to fetch dynamic dashboard data from backend server.';
-      setError(errorMsg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  const dashboardData = data || INITIAL_EMPTY_DASHBOARD_DATA;
 
   return {
-    data,
-    metrics: data?.metrics || [],
-    recentBookings: data?.recentBookings || [],
-    isLoading,
-    error,
-    refetch: fetchDashboard,
+    data: dashboardData,
+    summary: dashboardData.summary,
+    metrics: dashboardData.metrics,
+    revenueTrend: dashboardData.revenueTrend,
+    serviceDistribution: dashboardData.serviceDistribution,
+    fleetBreakdown: dashboardData.fleetBreakdown,
+    partnerSummary: dashboardData.partnerSummary,
+    recentBookings: dashboardData.recentBookings,
+    isLoading: isLoading || isFetching,
+    error: error instanceof Error ? error.message : null,
+    refetch,
   };
 }

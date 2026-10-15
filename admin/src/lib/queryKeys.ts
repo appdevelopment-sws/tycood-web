@@ -64,6 +64,10 @@ export const queryKeys = {
     list: (filters?: Record<string, any>) => ['taxes', 'list', filters] as const,
     detail: (id?: string) => ['taxes', 'detail', id] as const,
   },
+  dashboard: {
+    all: ['dashboard'] as const,
+    overview: (timeRange?: string) => ['dashboard', 'overview', timeRange] as const,
+  },
   settings: {
     all: ['settings'] as const,
     detail: (includeSecrets?: boolean) => ['settings', includeSecrets] as const,
