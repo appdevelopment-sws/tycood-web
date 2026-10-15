@@ -95,13 +95,13 @@ export class TechnicianBooking {
   @Column({ type: 'text', nullable: true })
   landmark: string | null;
 
-  @Column({ name: 'vehicle_make_model', length: 150, nullable: true })
+  @Column({ name: 'vehicle_make_model', type: 'varchar', length: 150, nullable: true })
   vehicleMakeModel: string | null;
 
-  @Column({ name: 'vehicle_plate_number', length: 50, nullable: true })
+  @Column({ name: 'vehicle_plate_number', type: 'varchar', length: 50, nullable: true })
   vehiclePlateNumber: string | null;
 
-  @Column({ name: 'vehicle_type', length: 50, default: 'Car' })
+  @Column({ name: 'vehicle_type', type: 'varchar', length: 50, default: 'Car' })
   vehicleType: string;
 
   @Column({ name: 'issue_description', type: 'text', nullable: true })
@@ -180,10 +180,10 @@ export class TechnicianBooking {
   })
   advancePaymentStatus: PaymentStatus;
 
-  @Column({ name: 'advance_payment_method', length: 50, default: 'UPI' })
+  @Column({ name: 'advance_payment_method', type: 'varchar', length: 50, default: 'UPI' })
   advancePaymentMethod: string;
 
-  @Column({ name: 'advance_payment_transaction_id', length: 150, nullable: true })
+  @Column({ name: 'advance_payment_transaction_id', type: 'varchar', length: 150, nullable: true })
   advancePaymentTransactionId: string | null;
 
   @Index()
@@ -195,10 +195,10 @@ export class TechnicianBooking {
   })
   remainingPaymentStatus: PaymentStatus;
 
-  @Column({ name: 'start_otp', length: 6 })
+  @Column({ name: 'start_otp', type: 'varchar', length: 6 })
   startOtp: string;
 
-  @Column({ name: 'completion_otp', length: 6 })
+  @Column({ name: 'completion_otp', type: 'varchar', length: 6 })
   completionOtp: string;
 
   @Column({ name: 'customer_notes', type: 'text', nullable: true })
@@ -216,7 +216,7 @@ export class TechnicianBooking {
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason: string | null;
 
-  @Column({ name: 'cancelled_by', length: 50, nullable: true })
+  @Column({ name: 'cancelled_by', type: 'varchar', length: 50, nullable: true })
   cancelledBy: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

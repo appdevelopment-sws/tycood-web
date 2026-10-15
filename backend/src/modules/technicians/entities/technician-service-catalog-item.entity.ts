@@ -22,11 +22,11 @@ export class TechnicianServiceCatalogItem {
   categoryId: string;
 
   @Index()
-  @Column({ length: 150 })
+  @Column({ type: 'varchar', length: 150 })
   name: string;
 
   @Index()
-  @Column({ length: 150 })
+  @Column({ type: 'varchar', length: 150 })
   slug: string;
 
   @Column({ type: 'text', nullable: true })

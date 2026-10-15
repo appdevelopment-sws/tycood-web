@@ -15,17 +15,17 @@ export class TechnicianCategory {
   id: string;
 
   @Index({ unique: true })
-  @Column({ length: 150, unique: true })
+  @Column({ type: 'varchar', length: 150, unique: true })
   name: string;
 
   @Index({ unique: true })
-  @Column({ length: 150, unique: true })
+  @Column({ type: 'varchar', length: 150, unique: true })
   slug: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ length: 100, default: 'Wrench' })
+  @Column({ type: 'varchar', length: 100, default: 'Wrench' })
   icon: string;
 
   @Column({ name: 'image_url', type: 'text', nullable: true })

@@ -24,16 +24,16 @@ export class TechnicianProfile {
   @Column({ name: 'user_id', type: 'uuid', unique: true })
   userId: string;
 
-  @Column({ name: 'workshop_name', length: 255, nullable: true })
+  @Column({ name: 'workshop_name', type: 'varchar', length: 255, nullable: true })
   workshopName: string;
 
   @Column({ type: 'text', array: true, default: '{}' })
   specializations: string[];
 
-  @Column({ name: 'experience_years', length: 50, default: '3-5 years' })
+  @Column({ name: 'experience_years', type: 'varchar', length: 50, default: '3-5 years' })
   experienceYears: string;
 
-  @Column({ name: 'trade_qualification', length: 255, nullable: true })
+  @Column({ name: 'trade_qualification', type: 'varchar', length: 255, nullable: true })
   tradeQualification: string;
 
   @Column({ type: 'text', nullable: true })
@@ -42,10 +42,10 @@ export class TechnicianProfile {
   @Column({ name: 'tools_available', type: 'text', array: true, default: '{}' })
   toolsAvailable: string[];
 
-  @Column({ name: 'vehicle_type', length: 100, default: 'Bike with Tool Mounts' })
+  @Column({ name: 'vehicle_type', type: 'varchar', length: 100, default: 'Bike with Tool Mounts' })
   vehicleType: string;
 
-  @Column({ name: 'base_area', length: 255, default: 'Patna Central' })
+  @Column({ name: 'base_area', type: 'varchar', length: 255, default: 'Patna Central' })
   baseArea: string;
 
   @Column({
@@ -61,7 +61,7 @@ export class TechnicianProfile {
   })
   serviceRadiusKm: number;
 
-  @Column({ name: 'operating_shift', length: 100, default: '24x7 Emergency & Daytime' })
+  @Column({ name: 'operating_shift', type: 'varchar', length: 100, default: '24x7 Emergency & Daytime' })
   operatingShift: string;
 
   @Column({ name: 'id_proof_uploaded', type: 'boolean', default: false })
@@ -73,19 +73,19 @@ export class TechnicianProfile {
   @Column({ name: 'police_clearance_accepted', type: 'boolean', default: false })
   policeClearanceAccepted: boolean;
 
-  @Column({ name: 'account_holder', length: 255, nullable: true })
+  @Column({ name: 'account_holder', type: 'varchar', length: 255, nullable: true })
   accountHolder: string;
 
-  @Column({ name: 'bank_name', length: 255, nullable: true })
+  @Column({ name: 'bank_name', type: 'varchar', length: 255, nullable: true })
   bankName: string;
 
-  @Column({ name: 'account_number', length: 100, nullable: true })
+  @Column({ name: 'account_number', type: 'varchar', length: 100, nullable: true })
   accountNumber: string;
 
-  @Column({ name: 'ifsc_code', length: 32, nullable: true })
+  @Column({ name: 'ifsc_code', type: 'varchar', length: 32, nullable: true })
   ifscCode: string;
 
-  @Column({ name: 'upi_id', length: 100, nullable: true })
+  @Column({ name: 'upi_id', type: 'varchar', length: 100, nullable: true })
   upiId: string;
 
   @Index()
