@@ -226,7 +226,13 @@ export class TechniciansService {
         });
       }
 
-      // 3. Delete technician profile
+      // 3. Remove professional application records for technician
+      await manager.delete(ProfessionalApplication, {
+        userId: tech.userId,
+        requestedRole: ProfessionalRole.TECHNICIAN,
+      });
+
+      // 4. Delete technician profile
       await manager.remove(tech);
 
       return {

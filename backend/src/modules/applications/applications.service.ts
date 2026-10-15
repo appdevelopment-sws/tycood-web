@@ -387,7 +387,24 @@ export class ApplicationsService {
       this.techProfileRepo.findOne({ where: { userId } }),
     ]);
 
-    return apps.map((app) => {
+    const activeApps: any[] = [];
+    for (const app of apps) {
+      if (app.requestedRole === ProfessionalRole.TECHNICIAN && !techProfile) {
+        // Technician profile was deleted, clean up orphaned application record
+        await this.appRepo.delete({ id: app.id });
+        continue;
+      }
+      if (app.requestedRole === ProfessionalRole.DRIVER && !driverProfile) {
+        // Driver profile was deleted, clean up orphaned application record
+        await this.appRepo.delete({ id: app.id });
+        continue;
+      }
+      if (app.requestedRole === ProfessionalRole.PARKING_OPERATOR && !parkingOp) {
+        // Parking operator was deleted, clean up orphaned application record
+        await this.appRepo.delete({ id: app.id });
+        continue;
+      }
+
       let liveStatus: string = app.status;
       if (
         app.requestedRole === ProfessionalRole.PARKING_OPERATOR &&
@@ -406,11 +423,13 @@ export class ApplicationsService {
         liveStatus = 'SUSPENDED';
       }
 
-      return {
+      activeApps.push({
         ...app,
         status: liveStatus,
-      };
-    });
+      });
+    }
+
+    return activeApps;
   }
 
   async findById(id: string): Promise<any> {
