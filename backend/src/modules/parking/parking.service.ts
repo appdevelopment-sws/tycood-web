@@ -38,6 +38,12 @@ import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role
 import { ApplicationStatus } from '../../common/enums/application-status.enum';
 import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
 import { ICurrentUser } from '../../common/interfaces/current-user.interface';
+import { Transaction } from '../transactions/entities/transaction.entity';
+import {
+  TransactionType,
+  TransactionCategory,
+  TransactionStatus,
+} from '../../common/enums/transaction.enums';
 
 @Injectable()
 export class ParkingService {
@@ -499,7 +505,45 @@ export class ParkingService {
       booking.transactionId = dto.transactionId || `TXN-${Date.now()}`;
       booking.holdExpiresAt = null;
 
-      return manager.save(booking);
+      const savedBooking = await manager.save(booking);
+
+      // Record transaction for the facility operator
+      const location = await manager.findOne(ParkingLocation, {
+        where: { id: savedBooking.locationId },
+        relations: { operator: true },
+      });
+      if (location?.operator?.userId && Number(savedBooking.advanceAmount) > 0) {
+        await manager.save(
+          manager.create(Transaction, {
+            userId: location.operator.userId,
+            role: BusinessRole.PARKING_OPERATOR,
+            type: TransactionType.CREDIT,
+            category: TransactionCategory.PARKING_ADVANCE,
+            amount: Number(savedBooking.advanceAmount),
+            currency: 'INR',
+            status: TransactionStatus.COMPLETED,
+            referenceId: savedBooking.id,
+            referenceType: 'PARKING_BOOKING',
+            title: `Advance Reservation • ${savedBooking.vehicleNumber}`,
+            description: `Advance slot reservation paid for ticket #${savedBooking.bookingNumber} (${savedBooking.vehicleType}) at ${location.name}.`,
+            paymentMethod: dto.paymentMethod || 'ONLINE',
+            metadata: {
+              ticketId: savedBooking.bookingNumber,
+              bookingId: savedBooking.id,
+              vehicleNumber: savedBooking.vehicleNumber,
+              vehicleType: savedBooking.vehicleType,
+              allocatedBay: savedBooking.allocatedBay,
+              durationHours: savedBooking.durationHours,
+              advancePaid: savedBooking.advanceAmount,
+              locationId: location.id,
+              locationTitle: location.name,
+            },
+            createdAt: new Date(),
+          }),
+        );
+      }
+
+      return savedBooking;
     });
   }
 
@@ -574,7 +618,41 @@ export class ParkingService {
           ? ParkingPaymentStatus.PARTIALLY_REFUNDED
           : booking.paymentStatus;
 
-      return manager.save(booking);
+      const savedBooking = await manager.save(booking);
+
+      if (refundAmount > 0 && location?.operatorId) {
+        const operator = await manager.findOne(ParkingOperator, {
+          where: { id: location.operatorId },
+        });
+        if (operator?.userId) {
+          await manager.save(
+            manager.create(Transaction, {
+              userId: operator.userId,
+              role: BusinessRole.PARKING_OPERATOR,
+              type: TransactionType.DEBIT,
+              category: TransactionCategory.REFUND,
+              amount: refundAmount,
+              currency: 'INR',
+              status: TransactionStatus.COMPLETED,
+              referenceId: savedBooking.id,
+              referenceType: 'PARKING_BOOKING',
+              title: `Booking Refund • ${savedBooking.vehicleNumber}`,
+              description: `Cancellation refund of ₹${refundAmount} for ticket #${savedBooking.bookingNumber}. Reason: ${reason || 'Customer cancellation'}`,
+              paymentMethod: 'ONLINE',
+              metadata: {
+                ticketId: savedBooking.bookingNumber,
+                bookingId: savedBooking.id,
+                vehicleNumber: savedBooking.vehicleNumber,
+                locationId: location.id,
+                refundAmount,
+              },
+              createdAt: new Date(),
+            }),
+          );
+        }
+      }
+
+      return savedBooking;
     });
   }
 
@@ -815,6 +893,10 @@ export class ParkingService {
         );
       }
 
+      if (dto.exitPinOtp && dto.exitPinOtp.trim() !== booking.gatePinOtp) {
+        throw new BadRequestException('Invalid exit pass OTP. Please check customer digital pass.');
+      }
+
       const checkInTime = booking.actualCheckInTime || booking.checkInTime;
       const now = new Date();
       const actualDurationHours = Math.max(
@@ -862,7 +944,47 @@ export class ParkingService {
       booking.paymentStatus = ParkingPaymentStatus.PAID;
       booking.providerEarnings = updatedTotal - Number(booking.commissionAmount);
 
-      return manager.save(booking);
+      const savedBooking = await manager.save(booking);
+
+      // Record transaction for the operator
+      if (location?.operator?.userId) {
+        await manager.save(
+          manager.create(Transaction, {
+            userId: location.operator.userId,
+            role: BusinessRole.PARKING_OPERATOR,
+            type: TransactionType.CREDIT,
+            category: TransactionCategory.PARKING_COLLECTION,
+            amount: updatedTotal,
+            currency: 'INR',
+            status: TransactionStatus.COMPLETED,
+            referenceId: savedBooking.id,
+            referenceType: 'PARKING_BOOKING',
+            title: `Parking Clearance • ${savedBooking.vehicleNumber}`,
+            description: `Vehicle departure completed. Ticket #${savedBooking.bookingNumber} (${savedBooking.vehicleType}) at ${location.name}. Duration: ${actualDurationHours} hrs.`,
+            paymentMethod: dto.collectedRemainingMethod || 'CASH',
+            metadata: {
+              ticketId: savedBooking.bookingNumber,
+              bookingId: savedBooking.id,
+              vehicleNumber: savedBooking.vehicleNumber,
+              vehicleType: savedBooking.vehicleType,
+              allocatedBay: savedBooking.allocatedBay,
+              allocatedFloor: savedBooking.allocatedFloor,
+              durationHours: actualDurationHours,
+              hourlyRate: savedBooking.hourlyRate,
+              advancePaid: savedBooking.advanceAmount,
+              remainingCollected: finalRemaining,
+              extraHoursCharge: extraHoursCharge,
+              totalAmount: updatedTotal,
+              locationId: location.id,
+              locationTitle: location.name,
+              exitTime: now.toISOString(),
+            },
+            createdAt: now,
+          }),
+        );
+      }
+
+      return savedBooking;
     });
   }
 

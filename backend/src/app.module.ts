@@ -14,6 +14,7 @@ import { SettingsModule } from './modules/settings/settings.module.js';
 import { LocationModule } from './modules/location/location.module.js';
 import { DispatchModule } from './modules/dispatch/dispatch.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -37,6 +38,7 @@ import { AppService } from './app.service';
     LocationModule,
     DispatchModule,
     ReviewsModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -12,7 +12,9 @@ import { Tax } from '../modules/taxes/entities/tax.entity.js';
 import { SystemSetting } from '../modules/settings/entities/system-setting.entity.js';
 import { ParkingOperator } from '../modules/parking/entities/parking-operator.entity';
 import { ParkingLocation } from '../modules/parking/entities/parking-location.entity';
+import { ParkingBooking } from '../modules/parking/entities/parking-booking.entity';
 import { Review } from '../modules/reviews/entities/review.entity.js';
+import { Transaction } from '../modules/transactions/entities/transaction.entity';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -32,7 +34,9 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       SystemSetting,
       ParkingOperator,
       ParkingLocation,
+      ParkingBooking,
       Review,
+      Transaction,
     ]),
   ],
   providers: [InitialSeedService],

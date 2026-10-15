@@ -1,0 +1,21 @@
+export enum TransactionType {
+  CREDIT = 'CREDIT',
+  DEBIT = 'DEBIT',
+}
+
+export enum TransactionCategory {
+  PARKING_COLLECTION = 'PARKING_COLLECTION',
+  PARKING_ADVANCE = 'PARKING_ADVANCE',
+  RIDE_FARE = 'RIDE_FARE',
+  TECH_FEE = 'TECH_FEE',
+  PAYOUT = 'PAYOUT',
+  REFUND = 'REFUND',
+  ADJUSTMENT = 'ADJUSTMENT',
+}
+
+export enum TransactionStatus {
+  COMPLETED = 'COMPLETED',
+  PENDING = 'PENDING',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}

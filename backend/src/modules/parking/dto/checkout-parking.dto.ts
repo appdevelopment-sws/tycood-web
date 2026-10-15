@@ -22,4 +22,9 @@ export class CheckoutParkingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: '6-digit driver exit pass OTP or QR pin code' })
+  @IsOptional()
+  @IsString()
+  exitPinOtp?: string;
 }
