@@ -3,6 +3,7 @@ import {
   Get,
   Put,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -85,6 +86,26 @@ export class TechniciansController {
     );
   }
 
+  @Get('categories/:categoryId/providers')
+  @ApiOperation({ summary: 'Find all mechanic profiles (online & offline) offering a specific category' })
+  @ApiParam({ name: 'categoryId', description: 'Technician Category UUID' })
+  @ApiQuery({ name: 'lat', required: false, type: Number })
+  @ApiQuery({ name: 'lng', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'List of matching mechanic profiles' })
+  async findProvidersForCategory(
+    @Param('categoryId') categoryId: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+  ) {
+    const latNum = lat ? parseFloat(lat) : undefined;
+    const lngNum = lng ? parseFloat(lng) : undefined;
+    return this.providerServicesService.findProvidersForCategory(
+      categoryId,
+      latNum,
+      lngNum,
+    );
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Update current technician profile details' })
   @ApiResponse({ status: 200, description: 'Updated technician profile' })
@@ -136,5 +157,14 @@ export class TechniciansController {
     @CurrentUser() admin: CurrentUserDto,
   ) {
     return this.techService.rejectTechnician(id, admin.userId, dto?.rejectionReason);
+  }
+
+  @Delete(':id')
+  @Roles(BusinessRole.ADMIN, BusinessRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete technician profile (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Technician Profile UUID' })
+  @ApiResponse({ status: 200, description: 'Technician profile deleted' })
+  async deleteTechnician(@Param('id') id: string) {
+    return this.techService.deleteTechnician(id);
   }
 }

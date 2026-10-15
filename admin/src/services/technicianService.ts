@@ -104,6 +104,12 @@ export const technicianService = {
     })
   },
 
+  deleteTechnician: async (id: string): Promise<any> => {
+    return apiClient<any>(`/technicians/${id}`, {
+      method: "DELETE",
+    })
+  },
+
   // Categories & Catalog Services
   getCategories: async (includeInactive = true): Promise<TechnicianCategory[]> => {
     return apiClient<TechnicianCategory[]>(
@@ -192,6 +198,7 @@ export interface TechnicianCategory {
   icon?: string
   imageUrl?: string
   isOther?: boolean
+  basePrice?: number
   displayOrder?: number
   isActive?: boolean
   services?: TechnicianServiceCatalogItem[]

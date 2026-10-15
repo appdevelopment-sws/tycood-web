@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { TechnicianProfile } from './entities/technician-profile.entity.js';
+import { TechnicianCategory } from './entities/technician-category.entity.js';
 import { TechnicianServiceCatalogItem } from './entities/technician-service-catalog-item.entity.js';
 import { TechnicianProviderService } from './entities/technician-provider-service.entity.js';
 import { ConfigureProviderServicesDto } from './dto/configure-provider-services.dto.js';
@@ -17,6 +18,8 @@ export class TechnicianProviderServicesService {
   constructor(
     @InjectRepository(TechnicianProfile)
     private readonly techProfileRepo: Repository<TechnicianProfile>,
+    @InjectRepository(TechnicianCategory)
+    private readonly categoryRepo: Repository<TechnicianCategory>,
     @InjectRepository(TechnicianServiceCatalogItem)
     private readonly serviceItemRepo: Repository<TechnicianServiceCatalogItem>,
     @InjectRepository(TechnicianProviderService)
@@ -145,6 +148,69 @@ export class TechnicianProviderServicesService {
         distanceKm: distanceKm ? Number(distanceKm.toFixed(1)) : null,
         currentAddress: ps.technicianProfile.currentAddress,
       };
+    });
+  }
+
+  async findProvidersForCategory(
+    categoryId: string,
+    lat?: number,
+    lng?: number,
+  ) {
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+    });
+
+    const techProfiles = await this.techProfileRepo.find({
+      relations: {
+        user: true,
+        providerServices: true,
+      },
+    });
+
+    const categoryBasePrice = category ? category.basePrice : 450;
+
+    const list = techProfiles.map((tech) => {
+      let distanceKm: number | null = null;
+      if (lat && lng && tech.currentLat && tech.currentLng) {
+        distanceKm = this.calculateDistance(lat, lng, tech.currentLat, tech.currentLng);
+      }
+
+      const customSvc = tech.providerServices?.find((ps) => ps.categoryId === categoryId);
+      const price = customSvc && customSvc.customPrice > 0 ? customSvc.customPrice : categoryBasePrice;
+      const isOnline = tech.availabilityStatus === AvailabilityStatus.AVAILABLE;
+
+      return {
+        technicianProfileId: tech.id,
+        technicianName: tech.user?.name || tech.workshopName || 'Professional Mechanic',
+        workshopName: tech.workshopName || (tech.user?.name ? `${tech.user.name}'s Workshop` : 'Authorized Auto Center'),
+        experienceYears: tech.experienceYears || '3-5 years',
+        vehicleType: tech.vehicleType || 'Rapid Response Van',
+        rating: 4.9,
+        price: Number(price),
+        isOnline,
+        availabilityStatus: tech.availabilityStatus,
+        verificationStatus: tech.verificationStatus,
+        toolsAvailable: tech.toolsAvailable || [],
+        bio: tech.bio || 'Equipped with diagnostic scanner, jumpstart kit and standard roadside tools.',
+        distanceKm: distanceKm ? Number(distanceKm.toFixed(1)) : null,
+        currentAddress: tech.currentAddress || tech.baseArea || 'Patna Central',
+        categoryName: category?.name || 'Assistance Service',
+        isOther: category?.isOther || false,
+      };
+    });
+
+    // Sort: Online technicians first, then rating descending, then distance ascending
+    return list.sort((a, b) => {
+      if (a.isOnline !== b.isOnline) {
+        return a.isOnline ? -1 : 1;
+      }
+      if (b.rating !== a.rating) {
+        return b.rating - a.rating;
+      }
+      if (a.distanceKm != null && b.distanceKm != null) {
+        return a.distanceKm - b.distanceKm;
+      }
+      return 0;
     });
   }
 

@@ -37,6 +37,10 @@ export class CreateTechnicianCategoryDto {
   @IsOptional()
   isOther?: boolean;
 
+  @ApiPropertyOptional({ example: 450.0, default: 0.0 })
+  @IsOptional()
+  basePrice?: number;
+
   @ApiPropertyOptional({ example: 1, default: 0 })
   @IsInt()
   @Min(0)

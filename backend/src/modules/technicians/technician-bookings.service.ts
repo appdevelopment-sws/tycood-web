@@ -106,14 +106,13 @@ export class TechnicianBookingsService {
         }
       }
 
-      // ----------------- FLOW A: KNOWN FIXED SERVICE -----------------
-      if (dto.bookingType === TechnicianBookingType.KNOWN_SERVICE) {
-        if (!dto.serviceCatalogItemId) {
-          throw new BadRequestException(
-            'serviceCatalogItemId is required when booking a known fixed service',
-          );
-        }
+      // Check if this is Flow B (Custom Inspection / Quote Required)
+      const isCustomInspection =
+        dto.bookingType === TechnicianBookingType.CUSTOM_INSPECTION ||
+        category?.isOther === true;
 
+      // ----------------- FLOW A: KNOWN FIXED SERVICE -----------------
+      if (!isCustomInspection) {
         if (dto.providerServiceId) {
           providerService = await manager.findOne(TechnicianProviderService, {
             where: { id: dto.providerServiceId },
@@ -123,21 +122,20 @@ export class TechnicianBookingsService {
             technicianProfileId = providerService.technicianProfileId;
             quotedAmount = providerService.customPrice;
           }
-        } else if (technicianProfileId) {
+        } else if (technicianProfileId && dto.categoryId) {
           providerService = await manager.findOne(TechnicianProviderService, {
             where: {
               technicianProfileId,
-              serviceCatalogItemId: dto.serviceCatalogItemId,
+              categoryId: dto.categoryId,
             },
           });
-          if (providerService) {
+          if (providerService && providerService.customPrice > 0) {
             quotedAmount = providerService.customPrice;
           }
         }
 
         if (quotedAmount <= 0) {
-          // If no specific provider was selected yet, default fallback price from standard rate
-          quotedAmount = 450.0;
+          quotedAmount = category && category.basePrice > 0 ? category.basePrice : 450.0;
         }
 
         advanceAmount = Number(
@@ -146,8 +144,9 @@ export class TechnicianBookingsService {
         remainingAmount = Number((quotedAmount - advanceAmount).toFixed(2));
         quotationStatus = QuotationStatus.NOT_REQUIRED;
 
-        // If user already authorized advance payment at checkout
-        if (dto.paymentTransactionId) {
+        const txId = dto.paymentTransactionId || (dto as any).advancePaymentTransactionId;
+        // If user already authorized advance payment at checkout via Razorpay
+        if (txId) {
           advancePaymentStatus = PaymentStatus.COMPLETED;
           status = TechnicianBookingStatus.CONFIRMED;
         } else {
@@ -155,7 +154,7 @@ export class TechnicianBookingsService {
         }
       }
 
-      // ----------------- FLOW B: UNKNOWN / OTHER / INSPECTION -----------------
+      // ----------------- FLOW B: UNKNOWN / OTHER / INSPECTION (QUOTATION) -----------------
       else {
         // Unknown issue / inspection: price is not yet known until mechanic quotes
         quotedAmount = 0.0;
@@ -508,8 +507,9 @@ export class TechnicianBookingsService {
   }
 
   async findById(id: string): Promise<TechnicianBooking> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     const booking = await this.bookingRepo.findOne({
-      where: { id },
+      where: isUuid ? { id } : { bookingNumber: id },
       relations: {
         user: true,
         technicianProfile: {

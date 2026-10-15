@@ -35,6 +35,19 @@ export class TechnicianCategory {
   @Column({ name: 'is_other', type: 'boolean', default: false })
   isOther: boolean;
 
+  @Column({
+    name: 'base_price',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0.0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => (value ? parseFloat(value) : 0),
+    },
+  })
+  basePrice: number;
+
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
 

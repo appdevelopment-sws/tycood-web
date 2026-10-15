@@ -26,6 +26,7 @@ interface CategoryFormData {
   name: string
   description: string
   icon: string
+  basePrice: number
   isOther: boolean
   displayOrder: number
   isActive: boolean
@@ -35,6 +36,7 @@ const INITIAL_CATEGORY_DATA: CategoryFormData = {
   name: "",
   description: "",
   icon: "Wrench",
+  basePrice: 450,
   isOther: false,
   displayOrder: 0,
   isActive: true,
@@ -61,6 +63,7 @@ export default function TechnicianCategoryDrawer({
           name: category?.name ?? "",
           description: category?.description ?? "",
           icon: category?.icon ?? "Wrench",
+          basePrice: category?.basePrice ? Number(category.basePrice) : 0,
           isOther: !!category?.isOther,
           displayOrder: category?.displayOrder ?? 0,
           isActive: category?.isActive ?? true,
@@ -96,6 +99,7 @@ export default function TechnicianCategoryDrawer({
   const onSubmit: SubmitHandler<CategoryFormData> = (data) => {
     mutation.mutate({
       ...data,
+      basePrice: Number(data.basePrice) || 0,
       displayOrder: Number(data.displayOrder) || 0,
     })
   }
@@ -192,6 +196,15 @@ export default function TechnicianCategoryDrawer({
         <div>
           {sectionHeader("02", "Quotation & Display Settings")}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              name="basePrice"
+              control={control}
+              label="Standard Base Rate (₹)"
+              type="number"
+              placeholder="e.g. 450"
+              readOnly={isViewMode}
+            />
+
             <FormField
               name="displayOrder"
               control={control}

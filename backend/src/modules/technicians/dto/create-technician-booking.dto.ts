@@ -105,8 +105,18 @@ export class CreateTechnicianBookingDto {
   @IsOptional()
   paymentMethod?: string;
 
+  @ApiPropertyOptional({ example: 'RAZORPAY', default: 'UPI' })
+  @IsString()
+  @IsOptional()
+  advancePaymentMethod?: string;
+
   @ApiPropertyOptional({ example: 'pay_xyz123456' })
   @IsString()
   @IsOptional()
   paymentTransactionId?: string;
+
+  @ApiPropertyOptional({ example: 'pay_xyz123456' })
+  @IsString()
+  @IsOptional()
+  advancePaymentTransactionId?: string;
 }

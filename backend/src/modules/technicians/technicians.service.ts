@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { TechnicianProfile } from './entities/technician-profile.entity';
+import { TechnicianProviderService } from './entities/technician-provider-service.entity';
 import { UpdateTechnicianProfileDto } from './dto/update-technician-profile.dto';
 import { QueryTechniciansDto } from './dto/query-technicians.dto';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
@@ -199,6 +200,39 @@ export class TechniciansService {
       );
 
       return savedTech;
+    });
+  }
+
+  async deleteTechnician(id: string): Promise<{ success: boolean; message: string }> {
+    const tech = await this.techRepo.findOne({
+      where: { id },
+    });
+    if (!tech) {
+      throw new NotFoundException(`Technician profile not found with ID ${id}`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      // 1. Delete associated technician provider services if any
+      await manager.delete(TechnicianProviderService, {
+        technicianProfileId: id,
+      });
+
+      // 2. Remove technician role assignment
+      const role = await manager.findOne(Role, { where: { name: BusinessRole.TECHNICIAN } });
+      if (role) {
+        await manager.delete(UserRole, {
+          userId: tech.userId,
+          roleId: role.id,
+        });
+      }
+
+      // 3. Delete technician profile
+      await manager.remove(tech);
+
+      return {
+        success: true,
+        message: 'Technician profile deleted successfully',
+      };
     });
   }
 }

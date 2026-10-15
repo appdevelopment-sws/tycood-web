@@ -9,7 +9,6 @@ import {
   Pencil,
   Trash2,
   Layers,
-  Clock,
   HelpCircle,
   CreditCard,
 } from "lucide-react"
@@ -29,11 +28,9 @@ import {
   technicianService,
   type Technician,
   type TechnicianCategory,
-  type TechnicianServiceCatalogItem,
 } from "@/services/technicianService"
 import TechnicianDrawer from "@/components/dialog/TechnicianDrawer"
 import TechnicianCategoryDrawer from "@/components/dialog/TechnicianCategoryDrawer"
-import TechnicianServiceDrawer from "@/components/dialog/TechnicianServiceDrawer"
 
 const INITIAL_MECHANIC_FILTERS = {
   search: "",
@@ -43,19 +40,18 @@ const INITIAL_MECHANIC_FILTERS = {
 
 export const MechanicsPage = () => {
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<"mechanics" | "categories" | "bookings">("mechanics")
+  const [activeTab, setActiveTab] = useState<
+    "mechanics" | "categories" | "bookings"
+  >("mechanics")
 
   // Disclosures
   const drawerDisclosure = useDisclosure<Technician>()
   const rejectDisclosure = useDisclosure<Technician>()
+  const deleteTechnicianDisclosure = useDisclosure<Technician>()
   const [rejectReason, setRejectReason] = useState("")
 
   const categoryDrawerDisclosure = useDisclosure<TechnicianCategory>()
-  const serviceDrawerDisclosure = useDisclosure<TechnicianServiceCatalogItem>()
-  const [selectedDefaultCatId, setSelectedDefaultCatId] = useState<string | undefined>()
-
   const deleteCategoryDisclosure = useDisclosure<TechnicianCategory>()
-  const deleteServiceDisclosure = useDisclosure<TechnicianServiceCatalogItem>()
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_MECHANIC_FILTERS)
 
@@ -78,7 +74,7 @@ export const MechanicsPage = () => {
     queryFn: async () => {
       return technicianService.getCategories(true)
     },
-    enabled: activeTab === "categories" || categoryDrawerDisclosure.isOpen || serviceDrawerDisclosure.isOpen,
+    enabled: activeTab === "categories" || categoryDrawerDisclosure.isOpen,
   })
 
   // 3. Fetch Technician Bookings
@@ -97,7 +93,9 @@ export const MechanicsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["technicians"] })
       drawerDisclosure.onClose()
-      toast.success("Technician / Mechanic verified and activated successfully!")
+      toast.success(
+        "Technician / Mechanic verified and activated successfully!"
+      )
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to verify technician")
@@ -130,20 +128,22 @@ export const MechanicsPage = () => {
     },
   })
 
-  const deleteServiceMutation = useMutation({
-    mutationFn: (id: string) => technicianService.deleteServiceItem(id),
+  const deleteTechnicianMutation = useMutation({
+    mutationFn: (id: string) => technicianService.deleteTechnician(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["technician-categories"] })
-      deleteServiceDisclosure.onClose()
-      toast.success("Service item deleted successfully")
+      queryClient.invalidateQueries({ queryKey: ["technicians"] })
+      deleteTechnicianDisclosure.onClose()
+      toast.success("Technician profile deleted successfully")
     },
     onError: (err: any) => {
-      toast.error(err?.message || "Failed to delete service item")
+      toast.error(err?.message || "Failed to delete technician profile")
     },
   })
 
   const handleOpenMechanic = (technician: Technician | null = null) => {
-    drawerDisclosure.onOpen(technician ? { ...technician, viewMode: true } : null)
+    drawerDisclosure.onOpen(
+      technician ? { ...technician, viewMode: true } : null
+    )
   }
 
   const handleFilterChange = useCallback(
@@ -256,14 +256,24 @@ export const MechanicsPage = () => {
               variant="ghost"
               className="h-8 w-8 p-0"
               onClick={() => handleOpenMechanic(row)}
+              title="View Profile"
             >
               <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-red-600 hover:bg-red-500/10 hover:text-red-700"
+              onClick={() => deleteTechnicianDisclosure.onOpen(row)}
+              title="Delete Technician"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ),
       },
     ]
-  }, [verifyMutation, rejectDisclosure])
+  }, [verifyMutation, rejectDisclosure, deleteTechnicianDisclosure])
 
   // Columns: Bookings
   const bookingColumns: Column<any>[] = useMemo(() => {
@@ -291,7 +301,8 @@ export const MechanicsPage = () => {
               {row.user?.name || "Customer"}
             </div>
             <div className="text-[11px] text-slate-500">
-              {row.vehicleMakeModel || row.vehicleType} • {row.vehiclePlateNumber || "No Plate"}
+              {row.vehicleMakeModel || row.vehicleType} •{" "}
+              {row.vehiclePlateNumber || "No Plate"}
             </div>
           </div>
         ),
@@ -306,15 +317,21 @@ export const MechanicsPage = () => {
               <span
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${
                   isCustom
-                    ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
-                    : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20"
+                    ? "border border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-300"
+                    : "border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300"
                 }`}
               >
-                {isCustom ? <HelpCircle className="h-3 w-3" /> : <Wrench className="h-3 w-3" />}
+                {isCustom ? (
+                  <HelpCircle className="h-3 w-3" />
+                ) : (
+                  <Wrench className="h-3 w-3" />
+                )}
                 {isCustom ? "Inspection / Quote" : "Fixed Service"}
               </span>
               <div className="mt-1 text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                {row.serviceCatalogItem?.name || row.category?.name || "Diagnostic Scan"}
+                {row.serviceCatalogItem?.name ||
+                  row.category?.name ||
+                  "Diagnostic Scan"}
               </div>
             </div>
           )
@@ -338,14 +355,15 @@ export const MechanicsPage = () => {
         header: "Financials (Split)",
         accessorKey: "quotedAmount",
         cell: (row) => (
-          <div className="text-xs space-y-0.5">
+          <div className="space-y-0.5 text-xs">
             <div className="font-bold text-slate-900 dark:text-slate-100">
               Total Quote: ₹{row.quotedAmount || 0}
             </div>
-            <div className="text-[10px] text-emerald-600 font-semibold">
-              Advance Paid: ₹{row.advanceAmount || 0} ({row.adminCommissionPercentage}%)
+            <div className="text-[10px] font-semibold text-emerald-600">
+              Advance Paid: ₹{row.advanceAmount || 0} (
+              {row.adminCommissionPercentage}%)
             </div>
-            <div className="text-[10px] text-indigo-600 font-semibold">
+            <div className="text-[10px] font-semibold text-indigo-600">
               Remaining: ₹{row.remainingAmount || 0}
             </div>
           </div>
@@ -357,7 +375,8 @@ export const MechanicsPage = () => {
           <div>
             <StatusBadge status={row.status} />
             <div className="mt-1 text-[10px] text-slate-500">
-              Start: <span className="font-mono font-bold">{row.startOtp}</span> | End:{" "}
+              Start: <span className="font-mono font-bold">{row.startOtp}</span>{" "}
+              | End:{" "}
               <span className="font-mono font-bold">{row.completionOtp}</span>
             </div>
           </div>
@@ -384,40 +403,17 @@ export const MechanicsPage = () => {
         category={categoryDrawerDisclosure.data}
       />
 
-      {/* Service Catalog Item Drawer */}
-      <TechnicianServiceDrawer
-        open={serviceDrawerDisclosure.isOpen}
-        onClose={serviceDrawerDisclosure.onClose}
-        serviceItem={serviceDrawerDisclosure.data}
-        categories={categories}
-        defaultCategoryId={selectedDefaultCatId}
-      />
-
       {/* Delete Category Confirmation */}
       <ConfirmDialog
         open={deleteCategoryDisclosure.isOpen}
         onOpenChange={deleteCategoryDisclosure.onClose}
         title="Delete Service Category"
-        description={`Are you sure you want to delete category "${deleteCategoryDisclosure.data?.name}"? All associated services will also be removed.`}
+        description={`Are you sure you want to delete category "${deleteCategoryDisclosure.data?.name}"?`}
         onConfirm={() =>
           deleteCategoryMutation.mutate(deleteCategoryDisclosure.data?.id || "")
         }
         isLoading={deleteCategoryMutation.isPending}
         confirmText="Delete Category"
-        variant="danger"
-      />
-
-      {/* Delete Service Item Confirmation */}
-      <ConfirmDialog
-        open={deleteServiceDisclosure.isOpen}
-        onOpenChange={deleteServiceDisclosure.onClose}
-        title="Delete Catalog Service Item"
-        description={`Are you sure you want to delete service "${deleteServiceDisclosure.data?.name}"?`}
-        onConfirm={() =>
-          deleteServiceMutation.mutate(deleteServiceDisclosure.data?.id || "")
-        }
-        isLoading={deleteServiceMutation.isPending}
-        confirmText="Delete Service"
         variant="danger"
       />
 
@@ -430,11 +426,29 @@ export const MechanicsPage = () => {
         onConfirm={() =>
           rejectMutation.mutate({
             id: rejectDisclosure.data?.id || "",
-            reason: rejectReason || "Qualifications or trade license could not be confirmed",
+            reason:
+              rejectReason ||
+              "Qualifications or trade license could not be confirmed",
           })
         }
         isLoading={rejectMutation.isPending}
         confirmText="Reject Registration"
+        variant="danger"
+      />
+
+      {/* Delete Technician Confirmation */}
+      <ConfirmDialog
+        open={deleteTechnicianDisclosure.isOpen}
+        onOpenChange={deleteTechnicianDisclosure.onClose}
+        title="Delete Technician Profile"
+        description={`Are you sure you want to permanently delete technician "${deleteTechnicianDisclosure.data?.user?.name || deleteTechnicianDisclosure.data?.workshopName || "Technician"}"? This will remove all their service offerings and revoke technician privileges.`}
+        onConfirm={() =>
+          deleteTechnicianMutation.mutate(
+            deleteTechnicianDisclosure.data?.id || ""
+          )
+        }
+        isLoading={deleteTechnicianMutation.isPending}
+        confirmText="Delete Technician"
         variant="danger"
       />
 
@@ -445,7 +459,8 @@ export const MechanicsPage = () => {
             Roadside Mechanics & Breakdown Hub
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Manage partner mechanics, service catalog categories, custom pricing, and roadside quotations
+            Manage partner mechanics, service catalog categories, custom
+            pricing, and roadside quotations
           </p>
         </div>
 
@@ -542,13 +557,15 @@ export const MechanicsPage = () => {
                 Service Categories & Master Catalog
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Categories and catalog items are created by admin. When mechanics register, they choose which services to offer and define their own custom rates.
+                Categories and catalog items are created by admin. When
+                mechanics register, they choose which services to offer and
+                define their own custom rates.
               </p>
             </div>
 
             <Button
               onClick={() => categoryDrawerDisclosure.onOpen(null)}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs flex items-center gap-1.5"
+              className="flex items-center gap-1.5 bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700"
             >
               <Plus className="h-4 w-4" />
               Add Category
@@ -566,44 +583,55 @@ export const MechanicsPage = () => {
                 }`}
               >
                 {/* Category Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl font-bold ${
                         cat.isOther
                           ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                           : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                       }`}
                     >
                       {cat.isOther ? (
-                        <HelpCircle className="h-5 w-5" />
+                        <HelpCircle className="h-6 w-6" />
                       ) : (
-                        <Wrench className="h-5 w-5" />
+                        <Wrench className="h-6 w-6" />
                       )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                        <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
                           {cat.name}
                         </h4>
-                        {cat.isOther && (
-                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border border-purple-500/20">
-                            Other / Inspection Flow
+                        {cat.isOther ? (
+                          <span className="rounded-full border border-purple-500/20 bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-900/60 dark:text-purple-200">
+                            Custom Quote / Inspection
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-emerald-500/20 bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                            {/* Fixed Rate: ₹{cat.basePrice} */}
+                            Fixed Rate
                           </span>
                         )}
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                             cat.isActive
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200"
                               : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                           }`}
                         >
                           {cat.isActive ? "Active" : "Inactive"}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        {cat.description || "No description provided"}
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {cat.description ||
+                          "Roadside breakdown service category"}
                       </p>
+                      <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-400">
+                        <span>Display Order: #{cat.displayOrder ?? 0}</span>
+                        <span>•</span>
+                        <span>Advance Commission: 20%</span>
+                      </div>
                     </div>
                   </div>
 
@@ -611,22 +639,16 @@ export const MechanicsPage = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-xs h-8 border-slate-300 dark:border-slate-700"
-                      onClick={() => {
-                        setSelectedDefaultCatId(cat.id)
-                        serviceDrawerDisclosure.onOpen(null)
-                      }}
+                      className="h-8 border-slate-300 text-xs dark:border-slate-700"
+                      onClick={() =>
+                        categoryDrawerDisclosure.onOpen({
+                          ...cat,
+                          viewMode: false,
+                        })
+                      }
                     >
-                      <Plus className="mr-1 h-3.5 w-3.5" />
-                      Add Service
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => categoryDrawerDisclosure.onOpen({ ...cat, viewMode: false })}
-                    >
-                      <Pencil className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
+                      <Pencil className="mr-1 h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
+                      Edit
                     </Button>
                     <Button
                       size="sm"
@@ -637,70 +659,6 @@ export const MechanicsPage = () => {
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                </div>
-
-                {/* Services List */}
-                <div className="mt-4">
-                  <div className="text-[11px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500 mb-2">
-                    Catalog Service Items ({cat.services?.length || 0})
-                  </div>
-
-                  {(!cat.services || cat.services.length === 0) ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
-                      No services in this category yet. Click &quot;Add Service&quot; above to add catalog items.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                      {cat.services.map((srv) => (
-                        <div
-                          key={srv.id}
-                          className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-3 transition hover:border-amber-500/30 dark:border-slate-800/80 dark:bg-slate-950/40"
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs">
-                                {srv.name}
-                              </span>
-                              {srv.isInspectionRequired && (
-                                <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-bold text-amber-700 dark:text-amber-300">
-                                  Quote
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                              {srv.description || "Standard breakdown labor"}
-                            </p>
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                              <Clock className="h-3 w-3" />
-                              ~{srv.estimatedDurationMinutes} mins
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
-                              onClick={() => {
-                                setSelectedDefaultCatId(cat.id)
-                                serviceDrawerDisclosure.onOpen({ ...srv, viewMode: false })
-                              }}
-                            >
-                              <Pencil className="h-3 w-3 text-slate-500" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-red-500 hover:bg-red-500/10"
-                              onClick={() => deleteServiceDisclosure.onOpen(srv)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

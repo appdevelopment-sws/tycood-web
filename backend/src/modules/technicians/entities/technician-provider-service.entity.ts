@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { TechnicianProfile } from './technician-profile.entity.js';
 import { TechnicianServiceCatalogItem } from './technician-service-catalog-item.entity.js';
+import { TechnicianCategory } from './technician-category.entity.js';
 
 const numericTransformer = {
   to: (value: number) => value,
@@ -17,7 +18,6 @@ const numericTransformer = {
 };
 
 @Entity('technician_provider_services')
-@Index(['technicianProfileId', 'serviceCatalogItemId'], { unique: true })
 export class TechnicianProviderService {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,8 +27,12 @@ export class TechnicianProviderService {
   technicianProfileId: string;
 
   @Index()
-  @Column({ name: 'service_catalog_item_id', type: 'uuid' })
-  serviceCatalogItemId: string;
+  @Column({ name: 'category_id', type: 'uuid', nullable: true })
+  categoryId: string | null;
+
+  @Index()
+  @Column({ name: 'service_catalog_item_id', type: 'uuid', nullable: true })
+  serviceCatalogItemId: string | null;
 
   @Column({
     name: 'custom_price',
@@ -61,10 +65,17 @@ export class TechnicianProviderService {
   technicianProfile: TechnicianProfile;
 
   @ManyToOne(
+    () => TechnicianCategory,
+    { onDelete: 'CASCADE', nullable: true },
+  )
+  @JoinColumn({ name: 'category_id' })
+  category: TechnicianCategory | null;
+
+  @ManyToOne(
     () => TechnicianServiceCatalogItem,
     (item) => item.providerServices,
-    { onDelete: 'CASCADE' },
+    { onDelete: 'CASCADE', nullable: true },
   )
   @JoinColumn({ name: 'service_catalog_item_id' })
-  serviceCatalogItem: TechnicianServiceCatalogItem;
+  serviceCatalogItem: TechnicianServiceCatalogItem | null;
 }
