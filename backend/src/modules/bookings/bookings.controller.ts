@@ -105,6 +105,31 @@ export class BookingsController {
     return this.bookingsService.getMyBookings(user.userId, query);
   }
 
+  @Get('pending-dispatches')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get pending unassigned booking requests within operating radius',
+    description:
+      'Returns pending requests matching service category and within 20km radius',
+  })
+  @ApiResponse({ status: 200, description: 'List of unassigned pending bookings' })
+  async getPendingDispatches(
+    @Query('serviceType') serviceType?: string,
+    @Query('lat') lat?: number,
+    @Query('lng') lng?: number,
+    @Query('radiusKm') radiusKm?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.bookingsService.getPendingDispatches({
+      serviceType,
+      lat: lat ? Number(lat) : undefined,
+      lng: lng ? Number(lng) : undefined,
+      radiusKm: radiusKm !== undefined ? Number(radiusKm) : undefined,
+      search,
+    });
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -190,30 +215,5 @@ export class BookingsController {
     @CurrentUser() user: CurrentUserDto,
   ) {
     return this.bookingsService.acceptBooking(id, user.userId);
-  }
-
-  @Get('pending-dispatches')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Get pending unassigned booking requests within operating radius',
-    description:
-      'Returns pending requests matching service category and within 20km radius',
-  })
-  @ApiResponse({ status: 200, description: 'List of unassigned pending bookings' })
-  async getPendingDispatches(
-    @Query('serviceType') serviceType?: string,
-    @Query('lat') lat?: number,
-    @Query('lng') lng?: number,
-    @Query('radiusKm') radiusKm?: number,
-    @Query('search') search?: string,
-  ) {
-    return this.bookingsService.getPendingDispatches({
-      serviceType,
-      lat: lat ? Number(lat) : undefined,
-      lng: lng ? Number(lng) : undefined,
-      radiusKm: radiusKm !== undefined ? Number(radiusKm) : undefined,
-      search,
-    });
   }
 }

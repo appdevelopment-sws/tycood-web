@@ -676,7 +676,7 @@ export class ParkingService {
       );
     }
 
-    qb.orderBy('b.checkInTime', query.sortOrder || 'DESC');
+    qb.orderBy('b.createdAt', query.sortOrder || 'DESC');
     qb.skip(query.skip).take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();
