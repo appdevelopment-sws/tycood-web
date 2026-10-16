@@ -198,6 +198,7 @@ export class UsersService {
     }
 
     if (dto.name !== undefined) user.name = dto.name;
+    if ((dto as any).profileImage !== undefined) user.profileImage = (dto as any).profileImage;
     if (dto.age !== undefined) user.age = dto.age;
     if (dto.address !== undefined) user.address = dto.address;
     if (dto.emergencyContact !== undefined) user.emergencyContact = dto.emergencyContact;

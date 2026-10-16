@@ -8,9 +8,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ProfessionalApplication } from './entities/professional-application.entity';
+import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { Role } from '../users/entities/role.entity';
 import { TechnicianProfile } from '../technicians/entities/technician-profile.entity';
+import { TechnicianProviderService } from '../technicians/entities/technician-provider-service.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { Vehicle } from '../drivers/entities/vehicle.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -107,6 +109,40 @@ export class ApplicationsService {
         });
       }
       await manager.save(techProfile);
+
+      // Save / update profile image on User if provided
+      if (dto.profileImage) {
+        await manager.update(User, { id: userId }, { profileImage: dto.profileImage });
+      }
+
+      // Save custom service prices configured by technician
+      if (dto.services && Array.isArray(dto.services)) {
+        for (const item of dto.services) {
+          if (!item.categoryId && !item.serviceCatalogItemId) continue;
+          let existingSvc = await manager.findOne(TechnicianProviderService, {
+            where: {
+              technicianProfileId: techProfile.id,
+              ...(item.categoryId ? { categoryId: item.categoryId } : {}),
+              ...(item.serviceCatalogItemId
+                ? { serviceCatalogItemId: item.serviceCatalogItemId }
+                : {}),
+            },
+          });
+          if (existingSvc) {
+            existingSvc.customPrice = Number(item.customPrice || 0);
+            existingSvc.isAvailable = item.isAvailable ?? true;
+          } else {
+            existingSvc = manager.create(TechnicianProviderService, {
+              technicianProfileId: techProfile.id,
+              categoryId: item.categoryId || null,
+              serviceCatalogItemId: item.serviceCatalogItemId || null,
+              customPrice: Number(item.customPrice || 0),
+              isAvailable: item.isAvailable ?? true,
+            });
+          }
+          await manager.save(existingSvc);
+        }
+      }
 
       // 2. Create or update application record
       if (existing) {

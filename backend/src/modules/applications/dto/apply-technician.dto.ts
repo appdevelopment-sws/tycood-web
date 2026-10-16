@@ -107,4 +107,16 @@ export class ApplyTechnicianDto {
   @IsOptional()
   @IsString()
   upiId?: string;
+
+  @ApiPropertyOptional({ example: '/uploads/profile.jpg', description: 'Technician avatar photo' })
+  @IsOptional()
+  @IsString()
+  profileImage?: string;
+
+  @ApiPropertyOptional({
+    description: 'Services and custom rates configured by technician',
+  })
+  @IsOptional()
+  @IsArray()
+  services?: any[];
 }

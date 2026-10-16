@@ -67,20 +67,15 @@ export class TechnicianProviderServicesService {
       const updatedList: TechnicianProviderService[] = [];
 
       for (const item of dto.services) {
-        const catalogItem = await manager.findOne(TechnicianServiceCatalogItem, {
-          where: { id: item.serviceCatalogItemId, isActive: true },
-        });
-
-        if (!catalogItem) {
-          throw new NotFoundException(
-            `Catalog service item not found or inactive: ${item.serviceCatalogItemId}`,
-          );
-        }
+        if (!item.categoryId && !item.serviceCatalogItemId) continue;
 
         let existing = await manager.findOne(TechnicianProviderService, {
           where: {
             technicianProfileId: profile.id,
-            serviceCatalogItemId: item.serviceCatalogItemId,
+            ...(item.categoryId ? { categoryId: item.categoryId } : {}),
+            ...(item.serviceCatalogItemId
+              ? { serviceCatalogItemId: item.serviceCatalogItemId }
+              : {}),
           },
         });
 
@@ -91,7 +86,8 @@ export class TechnicianProviderServicesService {
         } else {
           existing = manager.create(TechnicianProviderService, {
             technicianProfileId: profile.id,
-            serviceCatalogItemId: item.serviceCatalogItemId,
+            categoryId: item.categoryId || null,
+            serviceCatalogItemId: item.serviceCatalogItemId || null,
             customPrice: item.customPrice,
             isAvailable: item.isAvailable ?? true,
             notes: item.notes,
@@ -196,6 +192,7 @@ export class TechnicianProviderServicesService {
         currentAddress: tech.currentAddress || tech.baseArea || 'Patna Central',
         categoryName: category?.name || 'Assistance Service',
         isOther: category?.isOther || false,
+        profileImage: tech.user?.profileImage || null,
       };
     });
 

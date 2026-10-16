@@ -12,9 +12,15 @@ import {
 import { Type } from 'class-transformer';
 
 export class ProviderServiceItemInputDto {
-  @ApiProperty({ description: 'Catalog service item UUID' })
+  @ApiPropertyOptional({ description: 'Category UUID' })
   @IsUUID()
-  serviceCatalogItemId: string;
+  @IsOptional()
+  categoryId?: string;
+
+  @ApiPropertyOptional({ description: 'Catalog service item UUID' })
+  @IsUUID()
+  @IsOptional()
+  serviceCatalogItemId?: string;
 
   @ApiProperty({ example: 450.0, description: 'Technician custom service price in INR' })
   @IsNumber()
