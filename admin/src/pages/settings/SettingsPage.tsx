@@ -233,9 +233,21 @@ export const SettingsPage: React.FC = () => {
         accessorKey: "applicableOn",
         cell: (row) => {
           const scopeLabels: Record<string, { label: string; bg: string }> = {
+            ALL_SERVICES: {
+              label: "All Services (Universal)",
+              bg: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300",
+            },
             ALL_RIDES: {
-              label: "All Rides",
+              label: "All Cab Rides",
               bg: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+            },
+            TECHNICIAN: {
+              label: "Technicians & Mechanics",
+              bg: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+            },
+            PARKING: {
+              label: "Smart Parking",
+              bg: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300",
             },
             INTERCITY_ONLY: {
               label: "Intercity Cab",

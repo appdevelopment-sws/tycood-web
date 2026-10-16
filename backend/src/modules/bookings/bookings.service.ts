@@ -482,10 +482,15 @@ export class BookingsService {
           : 20;
       }
 
+      // Base ride fare excludes taxes and platform fee. Taxes & platform fees belong to Admin Advance.
+      const baseFareAmount = dto.baseFare && dto.baseFare > 0 ? dto.baseFare : dto.totalAmount;
+      const taxesAndFees = Math.max(0, dto.totalAmount - baseFareAmount);
+      const commissionAmount = Math.round(baseFareAmount * (commissionRate / 100));
+
       const advanceAmount =
         dto.advanceAmount !== undefined && dto.advanceAmount !== null
           ? dto.advanceAmount
-          : Math.round((dto.totalAmount * (commissionRate / 100)));
+          : commissionAmount + taxesAndFees;
 
       const remainingAmount =
         dto.remainingAmount !== undefined && dto.remainingAmount !== null

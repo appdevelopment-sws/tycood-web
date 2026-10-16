@@ -5,6 +5,19 @@ const LOCAL_STORAGE_TAXES_KEY = "cab_admin_custom_taxes"
 
 const DEFAULT_PRESET_TAXES: Tax[] = [
   {
+    id: "tax-default-platform-fee",
+    name: "Platform Convenience Fee",
+    code: "PLATFORM_FEE",
+    taxType: "FIXED",
+    rate: 40.0,
+    description: "Standard aggregated platform access, emergency dispatch and technology convenience fee",
+    applicableOn: "ALL_SERVICES",
+    isIncludedInFare: false,
+    isActive: true,
+    priority: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
     id: "tax-default-gst5",
     name: "Goods & Services Tax (GST 5%)",
     code: "GST_5",

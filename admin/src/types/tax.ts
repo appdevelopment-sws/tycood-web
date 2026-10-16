@@ -1,7 +1,10 @@
 export type TaxType = 'PERCENTAGE' | 'FIXED'
 
 export type TaxScope =
+  | 'ALL_SERVICES'
   | 'ALL_RIDES'
+  | 'TECHNICIAN'
+  | 'PARKING'
   | 'INTERCITY_ONLY'
   | 'AIRPORT_RIDES'
   | 'NIGHT_RIDES'

@@ -49,6 +49,16 @@ export class TaxesController {
     return this.taxesService.seedPresets();
   }
 
+  @Get('active')
+  @ApiOperation({
+    summary: 'Get active taxes and surcharges for a specific scope or service',
+    description: 'Returns active taxes applicable to ALL_SERVICES, or a specific service (TECHNICIAN, CAB, PARKING).',
+  })
+  @ApiResponse({ status: 200, description: 'Active taxes list' })
+  async findActive(@Query('scope') scope?: any) {
+    return this.taxesService.findActiveTaxes(scope);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get specific tax definition by UUID' })
   @ApiParam({ name: 'id', description: 'Tax UUID' })

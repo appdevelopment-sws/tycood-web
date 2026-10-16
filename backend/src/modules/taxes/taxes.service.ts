@@ -83,11 +83,28 @@ export class TaxesService {
       .createQueryBuilder('tax')
       .where('tax.isActive = :isActive', { isActive: true });
 
-    if (scope && scope !== TaxScope.ALL_RIDES) {
-      qb.andWhere(
-        '(tax.applicableOn = :scope OR tax.applicableOn = :allScope)',
-        { scope, allScope: TaxScope.ALL_RIDES },
-      );
+    if (scope) {
+      if (scope === TaxScope.TECHNICIAN) {
+        qb.andWhere('tax.applicableOn IN (:...scopes)', {
+          scopes: [TaxScope.ALL_SERVICES, TaxScope.TECHNICIAN],
+        });
+      } else if (scope === TaxScope.PARKING) {
+        qb.andWhere('tax.applicableOn IN (:...scopes)', {
+          scopes: [TaxScope.ALL_SERVICES, TaxScope.PARKING],
+        });
+      } else if (scope === TaxScope.ALL_RIDES) {
+        qb.andWhere('tax.applicableOn IN (:...scopes)', {
+          scopes: [TaxScope.ALL_SERVICES, TaxScope.ALL_RIDES],
+        });
+      } else if (scope === TaxScope.ALL_SERVICES) {
+        qb.andWhere('tax.applicableOn = :scope', {
+          scope: TaxScope.ALL_SERVICES,
+        });
+      } else {
+        qb.andWhere('tax.applicableOn IN (:...scopes)', {
+          scopes: [TaxScope.ALL_SERVICES, TaxScope.ALL_RIDES, scope],
+        });
+      }
     }
 
     return qb.orderBy('tax.priority', 'ASC').getMany();
@@ -160,6 +177,17 @@ export class TaxesService {
 
   async seedPresets(): Promise<Tax[]> {
     const presets: Partial<Tax>[] = [
+      {
+        name: 'Platform Convenience Fee',
+        code: 'PLATFORM_FEE',
+        taxType: TaxType.FIXED,
+        rate: 40.0,
+        description: 'Standard aggregated platform access, emergency dispatch and technology convenience fee',
+        applicableOn: TaxScope.ALL_SERVICES,
+        isIncludedInFare: false,
+        isActive: true,
+        priority: 0,
+      },
       {
         name: 'Goods & Services Tax (GST 5%)',
         code: 'GST_5',

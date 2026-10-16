@@ -24,6 +24,9 @@ import {
   QuotationStatus,
   PaymentStatus,
 } from '../../common/enums/index.js';
+import { Tax } from '../taxes/entities/tax.entity.js';
+import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
+import { TaxType } from '../taxes/enums/tax-type.enum.js';
 
 @Injectable()
 export class TechnicianBookingsService {
@@ -79,6 +82,7 @@ export class TechnicianBookingsService {
 
     return this.dataSource.transaction(async (manager) => {
       let quotedAmount = 0.0;
+      let taxAmount = 0.0;
       let advanceAmount = 0.0;
       let remainingAmount = 0.0;
       let quotationStatus = QuotationStatus.NOT_REQUIRED;
@@ -138,10 +142,30 @@ export class TechnicianBookingsService {
           quotedAmount = category && category.basePrice > 0 ? category.basePrice : 450.0;
         }
 
-        advanceAmount = Number(
+        taxAmount = 0.0;
+        const activeTaxes = await manager.find(Tax, {
+          where: { isActive: true },
+        });
+        const applicableTaxes = activeTaxes.filter(
+          (t) =>
+            t.applicableOn === TaxScope.ALL_SERVICES ||
+            t.applicableOn === TaxScope.TECHNICIAN,
+        );
+        for (const t of applicableTaxes) {
+          if (t.taxType === TaxType.PERCENTAGE) {
+            taxAmount += Math.round((quotedAmount * Number(t.rate)) / 100);
+          } else {
+            taxAmount += Math.round(Number(t.rate));
+          }
+        }
+
+        const adminCommissionAmount = Number(
           ((quotedAmount * adminCommissionPercentage) / 100).toFixed(2),
         );
-        remainingAmount = Number((quotedAmount - advanceAmount).toFixed(2));
+        // Tax & Platform fee are added to advance commission (collected by admin)
+        advanceAmount = Number((adminCommissionAmount + taxAmount).toFixed(2));
+        // Remaining balance left for mechanic is exactly base price minus commission
+        remainingAmount = Number((quotedAmount - adminCommissionAmount).toFixed(2));
         quotationStatus = QuotationStatus.NOT_REQUIRED;
 
         const txId = dto.paymentTransactionId || (dto as any).advancePaymentTransactionId;
@@ -185,6 +209,7 @@ export class TechnicianBookingsService {
         symptoms: dto.symptoms || [],
         mediaUrls: dto.mediaUrls || [],
         quotedAmount,
+        taxAmount,
         quotationNotes: null,
         quotationSubmittedAt: null,
         quotationAcceptedAt: null,
@@ -266,13 +291,34 @@ export class TechnicianBookingsService {
 
     const adminCommissionPercentage = await this.getCommissionPercentage();
     const quotedAmount = Number(dto.quotedAmount);
-    const advanceAmount = Number(
+
+    let taxAmount = 0.0;
+    const activeTaxes = await this.dataSource.getRepository(Tax).find({
+      where: { isActive: true },
+    });
+    const applicableTaxes = activeTaxes.filter(
+      (t) =>
+        t.applicableOn === TaxScope.ALL_SERVICES ||
+        t.applicableOn === TaxScope.TECHNICIAN,
+    );
+    for (const t of applicableTaxes) {
+      if (t.taxType === TaxType.PERCENTAGE) {
+        taxAmount += Math.round((quotedAmount * Number(t.rate)) / 100);
+      } else {
+        taxAmount += Math.round(Number(t.rate));
+      }
+    }
+
+    const adminCommissionAmount = Number(
       ((quotedAmount * adminCommissionPercentage) / 100).toFixed(2),
     );
-    const remainingAmount = Number((quotedAmount - advanceAmount).toFixed(2));
+    // Taxes added to advance commission
+    const advanceAmount = Number((adminCommissionAmount + taxAmount).toFixed(2));
+    const remainingAmount = Number((quotedAmount - adminCommissionAmount).toFixed(2));
 
     booking.technicianProfileId = profile.id;
     booking.quotedAmount = quotedAmount;
+    booking.taxAmount = taxAmount;
     booking.quotationNotes = dto.quotationNotes;
     booking.technicianNotes = dto.technicianNotes || booking.technicianNotes;
     booking.adminCommissionPercentage = adminCommissionPercentage;

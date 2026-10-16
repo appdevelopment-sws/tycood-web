@@ -162,6 +162,16 @@ export class TechnicianBooking {
   advanceAmount: number;
 
   @Column({
+    name: 'tax_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0.0,
+    transformer: numericTransformer,
+  })
+  taxAmount: number;
+
+  @Column({
     name: 'remaining_amount',
     type: 'decimal',
     precision: 10,
