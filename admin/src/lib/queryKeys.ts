@@ -72,6 +72,16 @@ export const queryKeys = {
     all: ['settings'] as const,
     detail: (includeSecrets?: boolean) => ['settings', includeSecrets] as const,
   },
+  truckTypes: {
+    all: ['truckTypes'] as const,
+    list: (filters?: Record<string, any>) => ['truckTypes', 'list', filters] as const,
+    detail: (id?: string) => ['truckTypes', 'detail', id] as const,
+  },
+  loads: {
+    all: ['loads'] as const,
+    list: (filters?: Record<string, any>) => ['loads', 'list', filters] as const,
+    detail: (id?: string) => ['loads', 'detail', id] as const,
+  },
 } as const
 
 

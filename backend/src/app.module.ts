@@ -16,6 +16,7 @@ import { DispatchModule } from './modules/dispatch/dispatch.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
+import { LogisticsModule } from './modules/logistics/logistics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -41,6 +42,7 @@ import { AppService } from './app.service';
     ReviewsModule,
     TransactionsModule,
     DashboardModule,
+    LogisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

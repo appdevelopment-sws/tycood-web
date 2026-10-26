@@ -9,6 +9,8 @@ import { LoginPage } from "./pages/auth/LoginPage"
 import { DashboardPage } from "./pages/dashboard/DashboardPage"
 import { OperatorsPage } from "./pages/operators/OperatorsPage"
 import CabTypePage from "./pages/cabType/CabTypePage"
+import { TruckTypesPage } from "./pages/truckTypes/TruckTypesPage"
+import { LoadsPage } from "./pages/loads/LoadsPage"
 import { RoutesPage } from "./pages/routes/RoutesPage"
 import { StationsPage } from "./pages/stations/StationsPage"
 import { SchedulesPage } from "./pages/schedules/SchedulesPage"
@@ -44,6 +46,8 @@ export function App() {
             <Route index element={<DashboardPage />} />
             <Route path={ROUTES.OPERATORS} element={<OperatorsPage />} />
             <Route path={ROUTES.CABS_TYPE} element={<CabTypePage />} />
+            <Route path={ROUTES.TRUCK_TYPES} element={<TruckTypesPage />} />
+            <Route path={ROUTES.LOADS} element={<LoadsPage />} />
             <Route path={ROUTES.ROUTES} element={<RoutesPage />} />
             <Route path={ROUTES.STATIONS} element={<StationsPage />} />
             <Route path={ROUTES.SCHEDULES} element={<SchedulesPage />} />

@@ -19,6 +19,9 @@ import { Tax } from '../modules/taxes/entities/tax.entity.js';
 import { SystemSetting } from '../modules/settings/entities/system-setting.entity.js';
 import { Review } from '../modules/reviews/entities/review.entity.js';
 import { Transaction } from '../modules/transactions/entities/transaction.entity';
+import { TruckType } from '../modules/logistics/entities/truck-type.entity';
+import { Load } from '../modules/logistics/entities/load.entity';
+import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -48,6 +51,9 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     SystemSetting,
     Review,
     Transaction,
+    TruckType,
+    Load,
+    LoadBid,
   ],
   synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging:

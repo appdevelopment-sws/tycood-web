@@ -20,6 +20,9 @@ import { TechnicianCategory } from '../modules/technicians/entities/technician-c
 import { TechnicianServiceCatalogItem } from '../modules/technicians/entities/technician-service-catalog-item.entity.js';
 import { TechnicianProviderService } from '../modules/technicians/entities/technician-provider-service.entity.js';
 import { TechnicianBooking } from '../modules/technicians/entities/technician-booking.entity.js';
+import { TruckType } from '../modules/logistics/entities/truck-type.entity';
+import { Load } from '../modules/logistics/entities/load.entity';
+import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -47,6 +50,9 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       TechnicianServiceCatalogItem,
       TechnicianProviderService,
       TechnicianBooking,
+      TruckType,
+      Load,
+      LoadBid,
     ]),
   ],
   providers: [InitialSeedService],

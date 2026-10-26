@@ -42,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {!isCollapsed && (
             <div className="flex flex-col overflow-hidden">
-              <span className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+              <span className="truncate text-sm font-bold tracking-tight dark:text-white">
                 {APP_CONFIG.LOGO_TEXT}
               </span>
               {/* <span className="truncate text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
@@ -98,11 +98,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className={({ isActive }) =>
                         `flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-all ${
                           isActive
-                            ? "shadow-primary-600/30 bg-primary shadow-md"
+                            ? "shadow-primary-600/30 bg-primary text-white shadow-md"
                             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200"
                         } ${isCollapsed ? "justify-center px-0" : ""}`
                       }
-                      title={isCollapsed ? item.title : undefined}
                     >
                       <IconComponent className="h-4 w-4 shrink-0" />
                       {!isCollapsed && (
