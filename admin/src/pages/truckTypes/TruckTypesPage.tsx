@@ -17,6 +17,7 @@ import { logisticsService } from "@/services/logisticsService"
 import { queryKeys } from "@/lib/queryKeys"
 import TruckTypeDrawer from "@/components/dialog/TruckTypeDialog"
 import type { TruckType, TruckTypeFilterParams } from "@/types/logistics"
+import { resolveCabImageUrl } from "@/lib/utils"
 
 const INITIAL_FILTERS: TruckTypeFilterParams = {
   search: "",
@@ -88,8 +89,19 @@ export const TruckTypesPage = () => {
         accessorKey: "name",
         cell: (row) => (
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-primary dark:border-slate-800 dark:bg-slate-900">
-              <Truck className="h-5 w-5" />
+            <div className="flex h-11 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1 text-primary dark:border-slate-800 dark:bg-slate-900">
+              {row.iconUrl ? (
+                <img
+                  src={resolveCabImageUrl(row.iconUrl)}
+                  alt={row.name}
+                  className="max-h-full max-w-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                  }}
+                />
+              ) : (
+                <Truck className="h-5 w-5" />
+              )}
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-slate-900 dark:text-slate-100">

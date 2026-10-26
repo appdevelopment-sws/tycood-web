@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { X, Plus } from "lucide-react"
+import { X, Plus, Truck, Ruler, Weight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { FormContainer } from "@/components/formContainer"
@@ -11,10 +11,12 @@ import {
   FormSelectField,
   FormCheckboxField,
 } from "@/components/ui/form-fields"
+import { ImageUpload } from "@/components/common/ImageUpload"
 import sectionHeader from "@/components/sectionHeader"
 import { queryKeys } from "@/lib/queryKeys"
 import { logisticsService } from "@/services/logisticsService"
 import type { TruckType, CreateTruckTypePayload } from "@/types/logistics"
+import { resolveCabImageUrl } from "@/lib/utils"
 
 export interface TruckTypeDrawerProps {
   open: boolean
@@ -76,6 +78,7 @@ const INITIAL_DATA: CreateTruckTypePayload = {
     "Cement & Bulker Goods",
     "TMT Iron Rods & Structural Steel",
   ],
+  iconUrl: "",
   sortOrder: 1,
   isActive: true,
   description: "Standard heavy duty multi-axle open truck for interstate and state highway freight",
@@ -91,10 +94,12 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
   const [materialsList, setMaterialsList] = useState<string[]>([])
   const [materialInput, setMaterialInput] = useState("")
 
-  const { handleSubmit, control, reset, setValue } = useForm<CreateTruckTypePayload>({
+  const { handleSubmit, control, reset, setValue, watch } = useForm<CreateTruckTypePayload>({
     defaultValues: INITIAL_DATA,
     mode: "onChange",
   })
+
+  const watchedValues = watch()
 
   useEffect(() => {
     if (open) {
@@ -114,6 +119,7 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
           wheelsNumber: Number(truckType?.wheelsNumber ?? 14),
           wheelCount: truckType?.wheelCount ?? "14 Wheeler",
           suitableMaterials: truckType?.suitableMaterials ?? [],
+          iconUrl: truckType?.iconUrl ?? "",
           sortOrder: truckType?.sortOrder ?? 0,
           isActive: truckType?.isActive ?? true,
           description: truckType?.description ?? "",
@@ -216,6 +222,62 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
         </div>
       }
     >
+      {/* Real-time App Marketplace Preview Card */}
+      <div className="mb-6 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100/70 p-4 shadow-sm dark:border-slate-800 dark:from-slate-900/60 dark:to-slate-950/80">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            User App Marketplace Card Preview
+          </span>
+          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            {watchedValues.isActive ? "ACTIVE IN APP" : "INACTIVE"}
+          </span>
+        </div>
+
+        <div className="mt-3 flex items-center gap-4">
+          <div className="flex h-16 w-20 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {watchedValues.iconUrl ? (
+              <img
+                src={resolveCabImageUrl(watchedValues.iconUrl)}
+                alt={watchedValues.name || "Truck"}
+                className="max-h-full max-w-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none"
+                }}
+              />
+            ) : (
+              <Truck className="h-8 w-8 text-primary" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
+                {watchedValues.name || "Truck Type Name"}
+              </span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                {watchedValues.category || "Open"}
+              </span>
+            </div>
+
+            <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+              {watchedValues.dimensionLabel || `${watchedValues.lengthFt || 28}ft Deck Length`}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400">
+                <Weight className="h-3.5 w-3.5" />
+                {watchedValues.capacityRange || "7.5 - 43 Ton"}
+              </span>
+              <span className="flex items-center gap-1">
+                <Ruler className="h-3.5 w-3.5" />
+                {watchedValues.lengthFt || 28}ft × {watchedValues.widthFt || 8}ft × {watchedValues.heightFt || 7.5}ft
+              </span>
+              <span>• {watchedValues.wheelCount || "14 Wheeler"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form
         id="truck-type-form"
         onSubmit={handleSubmit(onSubmit)}
@@ -260,9 +322,76 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
           </div>
         </div>
 
-        {/* Section 02: Dimensions & Length (Supports Long Rods / Steel) */}
+        {/* Section 02: Vehicle Icon & Visual Presentation */}
         <div>
-          {sectionHeader("02", "Body Dimensions & Length Clearance")}
+          {sectionHeader("02", "Vehicle Icon & Visual Presentation")}
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Upload custom truck icon / image or choose a preset. This icon is displayed directly on the User App load board filters.
+          </p>
+
+          {!isViewMode && (
+            <div className="space-y-3 mb-4">
+              <ImageUpload
+                value={watchedValues.iconUrl || ""}
+                label="Truck Vehicle Icon / Image"
+                helperText="Upload any PNG, JPG, SVG or WebP vehicle image or icon."
+                disabled={isViewMode}
+                readOnly={isViewMode}
+                onChange={(url) => {
+                  setValue("iconUrl", url, { shouldDirty: true, shouldValidate: true })
+                }}
+                onRemove={() => {
+                  setValue("iconUrl", "", { shouldDirty: true })
+                }}
+              />
+
+              {/* Quick Icon Presets */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] font-medium text-slate-400">
+                  Quick Icon Presets:
+                </span>
+                {[
+                  { label: "🚛 Open Body", path: "assets/truck-open.png" },
+                  { label: "📦 Container / Cargo", path: "assets/logistics.png" },
+                  { label: "🏗️ Flatbed Trailer", path: "assets/truck-trailer.png" },
+                  { label: "🚐 Mini / Pickup", path: "assets/car.png" },
+                  { label: "🛢️ Tanker", path: "assets/truck-tanker.png" },
+                  { label: "🚚 Tipper / Dumper", path: "assets/truck-tipper.png" },
+                ].map((preset) => (
+                  <button
+                    key={preset.path}
+                    type="button"
+                    onClick={() =>
+                      setValue("iconUrl", preset.path, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                      watchedValues.iconUrl === preset.path
+                        ? "border-primary bg-primary/10 text-primary dark:border-primary/80"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <FormField
+            control={control}
+            name="iconUrl"
+            label="Current Icon URL / Asset Path"
+            placeholder="e.g. /uploads/open-truck.png or assets/logistics.png"
+            readOnly={isViewMode}
+          />
+        </div>
+
+        {/* Section 03: Dimensions & Length (Supports Long Rods / Steel) */}
+        <div>
+          {sectionHeader("03", "Body Dimensions & Length Clearance")}
           <p className="text-xs text-muted-foreground mt-1 mb-3">
             Accurate length and height ensure long goods (e.g. 40ft TMT Iron Rods, Structural Steel Beams, Long Industrial Pipes) are only assigned to vehicles with sufficient deck clearance.
           </p>
@@ -306,9 +435,9 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
           </div>
         </div>
 
-        {/* Section 03: Tonnage Capacity & Wheel Axles */}
+        {/* Section 04: Tonnage Capacity & Wheel Axles */}
         <div>
-          {sectionHeader("03", "Payload Tonnage & Wheel / Axle Count")}
+          {sectionHeader("04", "Payload Tonnage & Wheel / Axle Count")}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mt-3">
             <FormField
               control={control}
@@ -356,9 +485,9 @@ export default function TruckTypeDrawer({ open, onClose, truckType }: TruckTypeD
           </div>
         </div>
 
-        {/* Section 04: Suitable Materials & Goods */}
+        {/* Section 05: Suitable Materials & Goods */}
         <div>
-          {sectionHeader("04", "Suitable Cargo & Goods Handled")}
+          {sectionHeader("05", "Suitable Cargo & Goods Handled")}
           <p className="text-xs text-muted-foreground mt-1 mb-2">
             Add types of materials this truck is certified or optimized to transport.
           </p>

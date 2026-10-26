@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { fileUploadService } from "@/services/fileUploadService"
+import { resolveCabImageUrl } from "@/lib/utils"
 
 export interface ImageUploadProps {
   value?: string
@@ -181,7 +182,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <div className="flex items-center gap-3">
             <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
               <img
-                src={value}
+                src={resolveCabImageUrl(value)}
                 alt="Uploaded preview"
                 className="h-full w-full object-cover transition group-hover:scale-105 duration-200"
                 onError={(e) => {
@@ -190,7 +191,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               />
               <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 opacity-0 group-hover:opacity-100 transition">
                 <a
-                  href={value}
+                  href={resolveCabImageUrl(value)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-full bg-white/80 p-1 text-slate-900 hover:bg-white transition"

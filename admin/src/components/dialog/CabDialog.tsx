@@ -11,7 +11,7 @@ import {
   FormSelectField,
   FormCheckboxField,
 } from "@/components/ui/form-fields"
-import { FileUpload } from "@/components/common/FileUpload"
+import { ImageUpload } from "@/components/common/ImageUpload"
 import sectionHeader from "@/components/sectionHeader"
 import { queryKeys } from "@/lib/queryKeys"
 import { cabService } from "@/services/cabService"
@@ -653,32 +653,55 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
             {/* Image Upload & URL input */}
             <div className="sm:col-span-2 lg:col-span-4 space-y-3">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
-                Cab Vehicle Image (Upload file or enter URL/asset path)
+                Cab Vehicle Image / Icon (Upload custom icon or choose preset)
               </label>
 
               {!isViewMode && (
-                <div className="mb-2">
-                  <FileUpload
-                    value={watchedValues.imageUrl ? [watchedValues.imageUrl] : []}
-                    label="Upload Vehicle Image"
-                    helperText="Upload JPG, PNG or WebP car image"
-                    accept="image/*"
-                    multiple={false}
+                <div className="space-y-3 mb-3">
+                  <ImageUpload
+                    value={watchedValues.imageUrl || ""}
+                    label="Upload Vehicle Icon / Photo"
+                    helperText="Upload custom car or cab icon (PNG, JPG, SVG, WebP). Directly uploaded to server with instant preview."
                     disabled={isViewMode}
                     readOnly={isViewMode}
-                    onChange={(res) => {
-                      if (res) {
-                        const url = Array.isArray(res)
-                          ? res[0]?.url || res[0]
-                          : res.url || res
-                        if (url) {
-                          setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
-                        }
-                      } else {
-                        setValue("imageUrl", "", { shouldDirty: true })
-                      }
+                    onChange={(url) => {
+                      setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
+                    }}
+                    onRemove={() => {
+                      setValue("imageUrl", "", { shouldDirty: true })
                     }}
                   />
+
+                  {/* Preset Quick Select Pills */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Quick Icon Presets:
+                    </span>
+                    {[
+                      { label: "🚗 Hatchback", path: "assets/car.png" },
+                      { label: "🚕 Sedan / Outstation", path: "assets/car-travelling.png" },
+                      { label: "🚙 SUV / Front", path: "assets/car-front.png" },
+                      { label: "📦 Cargo / Logistics", path: "assets/logistics.png" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.path}
+                        type="button"
+                        onClick={() =>
+                          setValue("imageUrl", preset.path, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          })
+                        }
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                          watchedValues.imageUrl === preset.path
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -686,7 +709,7 @@ export default function CabDrawer({ open, onClose, cab }: CabDrawerProps) {
                 control={control}
                 name="imageUrl"
                 label="CURRENT IMAGE URL / ASSET PATH"
-                placeholder="e.g. assets/car.png or https://example.com/cab.png"
+                placeholder="e.g. /uploads/car-icon.png or assets/car.png"
                 readOnly={isViewMode}
               />
             </div>
