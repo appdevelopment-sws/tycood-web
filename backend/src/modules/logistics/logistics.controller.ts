@@ -31,6 +31,7 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from '../../common/guards/jwt-auth
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { BusinessRole } from '../../common/enums/business-role.enum';
+import { BidStatus } from './enums/logistics.enums';
 
 @ApiTags('Freight Logistics & Load Board')
 @Controller('logistics')
@@ -132,6 +133,51 @@ export class LogisticsController {
     @CurrentUser() user?: CurrentUserDto,
   ) {
     return this.logisticsService.placeBid(id, dto, user?.userId);
+  }
+
+  @Get('loads/:id/bids')
+  @ApiOperation({ summary: 'Get all counter-bids placed on a specific freight load' })
+  @ApiParam({ name: 'id', description: 'Load UUID' })
+  @ApiResponse({ status: 200, description: 'List of driver counter-bids' })
+  async getLoadBids(@Param('id') id: string) {
+    return this.logisticsService.getLoadBids(id);
+  }
+
+  @Get('bids/my')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get all counter-bids placed by current user/driver' })
+  @ApiResponse({ status: 200, description: 'List of bids submitted by user' })
+  async getMyBids(
+    @CurrentUser() user?: CurrentUserDto,
+    @Query('userId') queryUserId?: string,
+    @Query('phone') queryPhone?: string,
+  ) {
+    const effectiveUserId = user?.userId || queryUserId;
+    return this.logisticsService.getMyBids(effectiveUserId, queryPhone);
+  }
+
+  @Patch('bids/:id/status')
+  @ApiOperation({ summary: 'Accept or reject a counter-bid on a load' })
+  @ApiParam({ name: 'id', description: 'Bid UUID' })
+  @ApiResponse({ status: 200, description: 'Updated bid record' })
+  async updateBidStatus(
+    @Param('id') id: string,
+    @Body() dto: { status: BidStatus },
+  ) {
+    return this.logisticsService.updateBidStatus(id, dto.status);
+  }
+
+  @Get('metrics')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get live logistics operational metrics' })
+  @ApiResponse({ status: 200, description: 'Operational counters' })
+  async getMetrics(
+    @CurrentUser() user?: CurrentUserDto,
+    @Query('userId') queryUserId?: string,
+    @Query('phone') queryPhone?: string,
+  ) {
+    const effectiveUserId = user?.userId || queryUserId;
+    return this.logisticsService.getLogisticsMetrics(effectiveUserId, queryPhone);
   }
 
   // =========================================================================

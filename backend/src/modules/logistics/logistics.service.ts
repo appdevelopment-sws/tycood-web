@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { TruckType } from './entities/truck-type.entity';
 import { Load } from './entities/load.entity';
 import { LoadBid } from './entities/load-bid.entity';
@@ -134,7 +134,8 @@ export class LogisticsService implements OnModuleInit {
   async getLoads(query: QueryLoadsDto) {
     const qb = this.loadRepo
       .createQueryBuilder('l')
-      .leftJoinAndSelect('l.truckType', 'tt');
+      .leftJoinAndSelect('l.truckType', 'tt')
+      .leftJoinAndSelect('l.bids', 'bids');
 
     if (query.search) {
       qb.andWhere(
@@ -273,6 +274,96 @@ export class LogisticsService implements OnModuleInit {
     });
 
     return this.bidRepo.save(bid);
+  }
+
+  async getLoadBids(loadId: string): Promise<LoadBid[]> {
+    return this.bidRepo.find({
+      where: { loadId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getMyBids(userId?: string, phone?: string): Promise<LoadBid[]> {
+    const qb = this.bidRepo
+      .createQueryBuilder('bid')
+      .leftJoinAndSelect('bid.load', 'load')
+      .leftJoinAndSelect('load.truckType', 'truckType');
+
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : null;
+    const last10Digits = cleanPhone && cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+
+    if (userId && last10Digits) {
+      qb.where(
+        '(bid.driverUserId = :userId OR bid.driverPhone = :phone OR bid.driverPhone LIKE :phonePattern)',
+        { userId, phone, phonePattern: `%${last10Digits}` },
+      );
+    } else if (userId) {
+      qb.where('bid.driverUserId = :userId', { userId });
+    } else if (last10Digits) {
+      qb.where('(bid.driverPhone = :phone OR bid.driverPhone LIKE :phonePattern)', {
+        phone,
+        phonePattern: `%${last10Digits}`,
+      });
+    }
+
+    qb.orderBy('bid.createdAt', 'DESC');
+    return qb.getMany();
+  }
+
+  async updateBidStatus(bidId: string, status: BidStatus): Promise<LoadBid> {
+    const bid = await this.bidRepo.findOne({
+      where: { id: bidId },
+      relations: { load: true },
+    });
+    if (!bid) {
+      throw new NotFoundException(`Bid with ID ${bidId} not found`);
+    }
+
+    bid.status = status;
+    const savedBid = await this.bidRepo.save(bid);
+
+    // If accepted, update load status to ASSIGNED and lock rate
+    if (status === BidStatus.ACCEPTED && bid.load) {
+      bid.load.status = LoadStatus.ASSIGNED;
+      bid.load.ratePerTruck = bid.proposedRate;
+      await this.loadRepo.save(bid.load);
+    }
+
+    return savedBid;
+  }
+
+  async getLogisticsMetrics(userId?: string, phone?: string) {
+    const activeLoads = await this.loadRepo.count({
+      where: { status: LoadStatus.OPEN },
+    });
+    const inTransit = await this.loadRepo.count({
+      where: { status: LoadStatus.IN_TRANSIT },
+    });
+    const completed = await this.loadRepo.count({
+      where: { status: LoadStatus.DELIVERED },
+    });
+
+    const totalBids = await this.bidRepo.count();
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : null;
+    const last10Digits = cleanPhone && cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+
+    const myBidsCount = (userId || last10Digits)
+      ? await this.bidRepo.count({
+          where: [
+            ...(userId ? [{ driverUserId: userId }] : []),
+            ...(phone ? [{ driverPhone: phone }] : []),
+            ...(last10Digits ? [{ driverPhone: Like(`%${last10Digits}`) }] : []),
+          ],
+        })
+      : totalBids;
+
+    return {
+      activeLoads,
+      inTransit,
+      completed,
+      totalBids,
+      myBidsCount,
+    };
   }
 
   // =========================================================================
