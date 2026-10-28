@@ -20,8 +20,17 @@ import { LogisticsService } from './logistics.service';
 import { CreateTruckTypeDto, UpdateTruckTypeDto } from './dto/truck-type.dto';
 import { CreateLoadDto, UpdateLoadDto, CreateLoadBidDto } from './dto/load.dto';
 import { QueryTruckTypesDto, QueryLoadsDto } from './dto/query-logistics.dto';
+import {
+  ApplyLogisticsProviderDto,
+  ReviewLogisticsProviderDto,
+  QueryLogisticsProvidersDto,
+} from './dto/logistics-provider.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentUserDto } from '../../common/interfaces/current-user.interface';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { BusinessRole } from '../../common/enums/business-role.enum';
 
 @ApiTags('Freight Logistics & Load Board')
 @Controller('logistics')
@@ -123,5 +132,74 @@ export class LogisticsController {
     @CurrentUser() user?: CurrentUserDto,
   ) {
     return this.logisticsService.placeBid(id, dto, user?.userId);
+  }
+
+  // =========================================================================
+  // LOGISTICS PROVIDER ONBOARDING & ADMIN VERIFICATION
+  // =========================================================================
+
+  @Post('providers/apply')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Submit application to become a verified Logistics Load Provider' })
+  @ApiResponse({ status: 201, description: 'Logistics provider application submitted for review' })
+  async applyProvider(
+    @Body() dto: ApplyLogisticsProviderDto,
+    @CurrentUser() user?: CurrentUserDto,
+    @Query('userId') queryUserId?: string,
+  ) {
+    const effectiveUserId = user?.userId || queryUserId || dto.userId;
+    return this.logisticsService.applyProvider(effectiveUserId, dto);
+  }
+
+  @Get('providers/my')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user submitted logistics provider verification status' })
+  @ApiResponse({ status: 200, description: 'Current logistics provider profile or status' })
+  async getMyProvider(
+    @CurrentUser() user?: CurrentUserDto,
+    @Query('userId') queryUserId?: string,
+    @Query('phone') queryPhone?: string,
+  ) {
+    const effectiveUserId = user?.userId || queryUserId;
+    return this.logisticsService.getMyProvider(effectiveUserId, queryPhone);
+  }
+
+  @Get('providers')
+  @ApiOperation({ summary: 'List all logistics provider applicants and active partners (Admin)' })
+  @ApiResponse({ status: 200, description: 'List of logistics provider records' })
+  async getProviders(@Query() query: QueryLogisticsProvidersDto) {
+    return this.logisticsService.getProviders(query);
+  }
+
+  @Get('providers/:id')
+  @ApiOperation({ summary: 'Get logistics provider details by ID' })
+  @ApiParam({ name: 'id', description: 'Provider UUID' })
+  @ApiResponse({ status: 200, description: 'Logistics provider record' })
+  async getProviderById(@Param('id') id: string) {
+    return this.logisticsService.getProviderById(id);
+  }
+
+  @Patch('providers/:id/verify')
+  @ApiOperation({ summary: 'Verify and approve logistics load provider (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Provider UUID' })
+  @ApiResponse({ status: 200, description: 'Verified logistics provider record' })
+  async verifyProvider(
+    @Param('id') id: string,
+    @Body() dto: { notes?: string },
+    @CurrentUser() admin?: CurrentUserDto,
+  ) {
+    return this.logisticsService.verifyProvider(id, admin?.userId, dto?.notes);
+  }
+
+  @Patch('providers/:id/reject')
+  @ApiOperation({ summary: 'Reject logistics provider application (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Provider UUID' })
+  @ApiResponse({ status: 200, description: 'Rejected logistics provider record' })
+  async rejectProvider(
+    @Param('id') id: string,
+    @Body() dto: { rejectionReason?: string },
+    @CurrentUser() admin?: CurrentUserDto,
+  ) {
+    return this.logisticsService.rejectProvider(id, admin?.userId, dto?.rejectionReason);
   }
 }

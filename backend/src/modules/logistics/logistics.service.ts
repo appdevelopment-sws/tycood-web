@@ -10,10 +10,22 @@ import { Repository } from 'typeorm';
 import { TruckType } from './entities/truck-type.entity';
 import { Load } from './entities/load.entity';
 import { LoadBid } from './entities/load-bid.entity';
+import { LogisticsProvider } from './entities/logistics-provider.entity';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/entities/user-role.entity';
+import { Role } from '../users/entities/role.entity';
 import { TruckBodyType, LoadStatus, PaymentTerms, BidStatus } from './enums/logistics.enums';
 import { CreateTruckTypeDto, UpdateTruckTypeDto } from './dto/truck-type.dto';
 import { CreateLoadDto, UpdateLoadDto, CreateLoadBidDto } from './dto/load.dto';
 import { QueryTruckTypesDto, QueryLoadsDto } from './dto/query-logistics.dto';
+import {
+  ApplyLogisticsProviderDto,
+  ReviewLogisticsProviderDto,
+  QueryLogisticsProvidersDto,
+} from './dto/logistics-provider.dto';
+import { VerificationStatus } from '../../common/enums/verification-status.enum';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
+import { BusinessRole } from '../../common/enums/business-role.enum';
 
 @Injectable()
 export class LogisticsService implements OnModuleInit {
@@ -26,6 +38,14 @@ export class LogisticsService implements OnModuleInit {
     private readonly loadRepo: Repository<Load>,
     @InjectRepository(LoadBid)
     private readonly bidRepo: Repository<LoadBid>,
+    @InjectRepository(LogisticsProvider)
+    private readonly providerRepo: Repository<LogisticsProvider>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepo: Repository<UserRole>,
+    @InjectRepository(Role)
+    private readonly roleRepo: Repository<Role>,
   ) {}
 
   async onModuleInit() {
@@ -137,6 +157,21 @@ export class LogisticsService implements OnModuleInit {
 
     if (query.minFeet) {
       qb.andWhere('l.requiredMinLengthFt >= :mf', { mf: query.minFeet });
+    }
+
+    if (query.lengthFt) {
+      qb.andWhere('l.requiredMinLengthFt = :lf', { lf: query.lengthFt });
+    }
+
+    if (query.truckTypeId) {
+      qb.andWhere('l.truckTypeId = :ttid', { ttid: query.truckTypeId });
+    }
+
+    if (query.capacityRange && query.capacityRange !== 'ALL') {
+      qb.andWhere(
+        '(LOWER(l.totalLoadTons) LIKE :cr OR LOWER(l.requiredTruckTypeDesc) LIKE :cr)',
+        { cr: `%${query.capacityRange.toLowerCase()}%` },
+      );
     }
 
     if (query.minTons) {
@@ -443,7 +478,11 @@ export class LogisticsService implements OnModuleInit {
       );
 
       const openType = savedTruckTypes.find((t) => t.category === 'Open');
+      const containerType = savedTruckTypes.find((t) => t.category === 'Container');
       const trailerType = savedTruckTypes.find((t) => t.category === 'Trailer');
+      const tankerType = savedTruckTypes.find((t) => t.category === 'Tanker');
+      const tipperType = savedTruckTypes.find((t) => t.category === 'Tipper');
+      const miniType = savedTruckTypes.find((t) => t.category === 'Mini/Pickup');
       const lcvType = savedTruckTypes.find((t) => t.category === 'LCV');
 
       // Seed realistic loads matching user's screenshots
@@ -465,7 +504,7 @@ export class LogisticsService implements OnModuleInit {
           totalLoadNumber: 30.0,
           truckTypeId: openType?.id,
           requiredTruckCategory: 'Open',
-          requiredTruckTypeDesc: 'Open Half/Full Body',
+          requiredTruckTypeDesc: '28ft Open Body (14 Wheeler)',
           requiredWheels: '14 Wheeler',
           requiredMinLengthFt: 28,
           paymentTerms: PaymentTerms.TO_PAY,
@@ -496,9 +535,9 @@ export class LogisticsService implements OnModuleInit {
           totalLoadNumber: 16.0,
           truckTypeId: openType?.id,
           requiredTruckCategory: 'Open',
-          requiredTruckTypeDesc: 'Open High Bed',
+          requiredTruckTypeDesc: '22ft Open High Bed (10 Wheeler)',
           requiredWheels: '10 Wheeler',
-          requiredMinLengthFt: 24,
+          requiredMinLengthFt: 22,
           paymentTerms: PaymentTerms.TO_PAY,
           ratePerTruck: 9500.0,
           isRateNegotiable: true,
@@ -507,6 +546,161 @@ export class LogisticsService implements OnModuleInit {
           transporterCompany: 'BIHAR BENGAL CARRIERS',
           transporterPhone: '+91 98350 11234',
           transporterRating: 4.2,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
+          loadNumber: 'LD-9285',
+          pickupCity: 'Patna',
+          pickupState: 'Bihar',
+          pickupAddress: 'Didarganj Toll Plaza Logistics Hub',
+          unloadingCity: 'Gaya',
+          unloadingState: 'Bihar',
+          unloadingAddress: 'Bodh Gaya Industrial Feeder Centre',
+          addressNote: 'Toll will be reimbursed with original receipts',
+          distanceKm: 110.0,
+          product: 'Steel Angles & Channels (18ft)',
+          productCategory: 'Iron & Steel',
+          productLengthFt: 18.0,
+          totalLoadTons: '8-10 ton',
+          totalLoadNumber: 9.0,
+          truckTypeId: openType?.id,
+          requiredTruckCategory: 'Open',
+          requiredTruckTypeDesc: '19ft Open Body (6 Wheeler)',
+          requiredWheels: '6 Wheeler',
+          requiredMinLengthFt: 19,
+          paymentTerms: PaymentTerms.TO_PAY,
+          ratePerTruck: 13500.0,
+          isRateNegotiable: true,
+          pricingNote: 'Prompt clearance and driver tea allowance included',
+          transporterName: 'VIKRAM SINGH',
+          transporterCompany: 'MAGADH EXPRESS FREIGHT',
+          transporterPhone: '+91 94312 33445',
+          transporterRating: 4.5,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
+          loadNumber: 'LD-9288',
+          pickupCity: 'Patna',
+          pickupState: 'Bihar',
+          pickupAddress: 'Pataliputra Industrial Estate',
+          unloadingCity: 'Kolkata',
+          unloadingState: 'West Bengal',
+          unloadingAddress: 'Dankuni Logistics Park, WB',
+          addressNote: 'Custom seal provided at pickup point',
+          distanceKm: 580.0,
+          product: 'Branded Consumer Electronics & LED TVs',
+          productCategory: 'Electronics',
+          productLengthFt: 0,
+          totalLoadTons: '7-9 ton',
+          totalLoadNumber: 8.0,
+          truckTypeId: containerType?.id,
+          requiredTruckCategory: 'Container',
+          requiredTruckTypeDesc: '19ft Closed Container (6 Wheeler)',
+          requiredWheels: '6 Wheeler',
+          requiredMinLengthFt: 19,
+          paymentTerms: PaymentTerms.ADVANCE_BALANCE,
+          ratePerTruck: 34000.0,
+          isRateNegotiable: true,
+          pricingNote: 'GPS tracking mandatory during transit',
+          transporterName: 'SANJAY CHOUDHARY',
+          transporterCompany: 'EAST INDIA CARGO EXPRESS',
+          transporterPhone: '+91 99341 55667',
+          transporterRating: 4.9,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
+          loadNumber: 'LD-9289',
+          pickupCity: 'Danapur',
+          pickupState: 'Bihar',
+          pickupAddress: 'Danapur Rail Freight Siding',
+          unloadingCity: 'Siliguri',
+          unloadingState: 'West Bengal',
+          unloadingAddress: 'Fulbari Inland Container Depot',
+          addressNote: 'Sealed box container only',
+          distanceKm: 460.0,
+          product: 'E-commerce FMCG & Packaged Snacks',
+          productCategory: 'FMCG',
+          productLengthFt: 0,
+          totalLoadTons: '7.5-9 ton',
+          totalLoadNumber: 8.5,
+          truckTypeId: containerType?.id,
+          requiredTruckCategory: 'Container',
+          requiredTruckTypeDesc: '32ft SXL Container (Single Axle)',
+          requiredWheels: '6 Wheeler',
+          requiredMinLengthFt: 32,
+          paymentTerms: PaymentTerms.TO_PAY,
+          ratePerTruck: 42000.0,
+          isRateNegotiable: true,
+          pricingNote: 'Volumetric cargo, lightweight but high cube capacity',
+          transporterName: 'ALOK RANJAN',
+          transporterCompany: 'QUICKFREIGHT LOGISTICS',
+          transporterPhone: '+91 94314 66778',
+          transporterRating: 4.7,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
+          loadNumber: 'LD-9292',
+          pickupCity: 'Barauni',
+          pickupState: 'Bihar',
+          pickupAddress: 'IOCL Barauni Refinery Terminal Gate 4',
+          unloadingCity: 'Patna',
+          unloadingState: 'Bihar',
+          unloadingAddress: 'Indian Oil Depot, Sipara Patna',
+          addressNote: 'PESO explosive license and spark arrestor mandatory',
+          distanceKm: 125.0,
+          product: 'Refined Kerosene / Light Diesel Oil',
+          productCategory: 'Petroleum',
+          productLengthFt: 0,
+          totalLoadTons: '12-15 ton',
+          totalLoadNumber: 14.0,
+          truckTypeId: tankerType?.id,
+          requiredTruckCategory: 'Tanker',
+          requiredTruckTypeDesc: '12-15 Ton Tanker (16-18 KL • 10W)',
+          requiredWheels: '10 Wheeler',
+          requiredMinLengthFt: 24,
+          paymentTerms: PaymentTerms.TO_PAY,
+          ratePerTruck: 17500.0,
+          isRateNegotiable: false,
+          pricingNote: 'Fixed oil company tariff, unloader signature payment',
+          transporterName: 'RAJESHWAR TIWARY',
+          transporterCompany: 'BIHAR REFINERY FLEET',
+          transporterPhone: '+91 94318 44112',
+          transporterRating: 4.6,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
+          loadNumber: 'LD-9294',
+          pickupCity: 'Patna',
+          pickupState: 'Bihar',
+          pickupAddress: 'Sudha Dairy Plant, Phulwarisharif',
+          unloadingCity: 'Muzaffarpur',
+          unloadingState: 'Bihar',
+          unloadingAddress: 'Timul Chilling Plant, Muzaffarpur',
+          addressNote: 'Food grade stainless steel SS304 barrel required',
+          distanceKm: 78.0,
+          product: 'Raw Pasteurized Milk (Chilled)',
+          productCategory: 'Dairy Products',
+          productLengthFt: 0,
+          totalLoadTons: '8-11 ton',
+          totalLoadNumber: 10.0,
+          truckTypeId: tankerType?.id,
+          requiredTruckCategory: 'Tanker',
+          requiredTruckTypeDesc: '8-11 Ton Tanker (10-14 KL • 6W)',
+          requiredWheels: '6 Wheeler',
+          requiredMinLengthFt: 20,
+          paymentTerms: PaymentTerms.TO_PAY,
+          ratePerTruck: 11500.0,
+          isRateNegotiable: false,
+          pricingNote: 'Immediate pump unloading within 45 mins',
+          transporterName: 'ANIL KUMAR SINHA',
+          transporterCompany: 'DAIRY CARRIERS UNION',
+          transporterPhone: '+91 97712 33441',
+          transporterRating: 4.9,
           isTransporterVerified: true,
           status: LoadStatus.OPEN,
         },
@@ -543,6 +737,36 @@ export class LogisticsService implements OnModuleInit {
           instructions: 'Mandatory red flags on overhang; verified strapping required.',
         },
         {
+          loadNumber: 'LD-9295',
+          pickupCity: 'Sonbhadra',
+          pickupState: 'Uttar Pradesh',
+          pickupAddress: 'Sone River Sand Ghat, Chopan',
+          unloadingCity: 'Patna',
+          unloadingState: 'Bihar',
+          unloadingAddress: 'Digha AIIMS Flyover Construction Yard',
+          addressNote: 'M-Chalan and GPS pass mandatory at Sonbhadra border',
+          distanceKm: 240.0,
+          product: 'Red River Sand (Sone Balu)',
+          productCategory: 'Construction Aggregate',
+          totalLoadTons: '16-20 ton',
+          totalLoadNumber: 18.0,
+          truckTypeId: tipperType?.id,
+          requiredTruckCategory: 'Tipper',
+          requiredTruckTypeDesc: '16-20 Ton Hydraulic Tipper (10 Wheeler)',
+          requiredWheels: '10 Wheeler',
+          requiredMinLengthFt: 22,
+          paymentTerms: PaymentTerms.TO_PAY,
+          ratePerTruck: 18500.0,
+          isRateNegotiable: true,
+          pricingNote: 'Quick mechanical tip unloading under 15 mins',
+          transporterName: 'VIJAY PRATAP SINGH',
+          transporterCompany: 'SONE VALLEY CARRIERS',
+          transporterPhone: '+91 94319 88776',
+          transporterRating: 4.3,
+          isTransporterVerified: true,
+          status: LoadStatus.OPEN,
+        },
+        {
           loadNumber: 'LD-9284',
           pickupCity: 'Danapur',
           pickupState: 'Bihar',
@@ -576,8 +800,273 @@ export class LogisticsService implements OnModuleInit {
 
       await this.loadRepo.save(initialLoads.map((l) => this.loadRepo.create(l)));
       this.logger.log('Seeded Indian Freight Logistics Truck Types and Loads successfully');
+
+      const providerCount = await this.providerRepo.count();
+      if (providerCount === 0) {
+        let sampleUser = await this.userRepo.findOne({ where: { phone: '+91 98765 43210' } });
+        if (!sampleUser) {
+          sampleUser = await this.userRepo.findOne({ where: { email: 'admin@cabbooking.com' } });
+        }
+        if (!sampleUser) {
+          sampleUser = this.userRepo.create({
+            name: 'Test Transporter',
+            phone: '+91 98765 43210',
+            email: 'transporter@testfreight.com',
+            city: 'Patna',
+            status: 'ACTIVE',
+            isActive: true,
+          });
+          sampleUser = await this.userRepo.save(sampleUser);
+        }
+
+        const initialProvider = this.providerRepo.create({
+          userId: sampleUser.id,
+          businessName: 'test Freight Lines',
+          contactPerson: 'test',
+          phone: sampleUser.phone || '+91 98765 43210',
+          email: sampleUser.email || 'transporter@testfreight.com',
+          operatingCity: 'Patna',
+          operatingHub: 'Transport Nagar, Kumhrar, Patna',
+          businessType: 'Transporter / Fleet Broker',
+          primaryCargoTypes: ['Agro / Grains', 'Iron & Steel', 'FMCG'],
+          requiredVehicleCategories: ['Open', 'Container', 'Trailer'],
+          gstin: '123123123',
+          pan: 'AAACR4829K',
+          isGstVerified: true,
+          isAadhaarVerified: true,
+          idProofUploaded: true,
+          businessProofUploaded: true,
+          accountHolder: 'test Freight Lines',
+          bankName: 'State Bank of India',
+          accountNumber: '382910482910',
+          ifscCode: 'SBIN0001234',
+          upiId: 'freight@upi',
+          verificationStatus: VerificationStatus.PENDING,
+        });
+
+        await this.providerRepo.save(initialProvider);
+        this.logger.log('Seeded initial pending logistics provider: test Freight Lines');
+      }
     } catch (err) {
       this.logger.error('Failed to seed logistics data:', err);
     }
+  }
+
+  // =========================================================================
+  // LOGISTICS PROVIDERS ONBOARDING & VERIFICATION (ADMIN & MOBILE)
+  // =========================================================================
+
+  async applyProvider(userId: string | undefined, dto: ApplyLogisticsProviderDto): Promise<LogisticsProvider> {
+    const resolvedGstin = dto.gstin || dto.gstinNumber || null;
+    const resolvedPan = dto.pan || dto.panNumber || null;
+
+    // 1. Resolve or auto-provision real database User to prevent foreign key errors
+    let targetUser: User | null = null;
+    if (userId) {
+      targetUser = await this.userRepo.findOne({ where: { id: userId } });
+    }
+    if (!targetUser && dto.userId) {
+      targetUser = await this.userRepo.findOne({ where: { id: dto.userId } });
+    }
+    if (!targetUser && dto.phone) {
+      targetUser = await this.userRepo.findOne({ where: { phone: dto.phone } });
+    }
+    if (!targetUser && dto.email) {
+      targetUser = await this.userRepo.findOne({ where: { email: dto.email } });
+    }
+
+    if (!targetUser) {
+      // Auto-create a user profile for this partner applicant
+      const partnerRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.PARTNER },
+      });
+
+      targetUser = this.userRepo.create({
+        name: dto.contactPerson || dto.businessName || 'Transporter Partner',
+        phone: dto.phone || undefined,
+        email: dto.email || `logistics_${Date.now()}@platform.local`,
+        city: dto.operatingCity || 'Patna',
+        status: 'ACTIVE',
+        isActive: true,
+      });
+      targetUser = await this.userRepo.save(targetUser);
+
+      if (partnerRole) {
+        await this.userRoleRepo.save(
+          this.userRoleRepo.create({
+            userId: targetUser.id,
+            roleId: partnerRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+          }),
+        );
+      }
+    }
+
+    const effectiveUserId = targetUser.id;
+
+    // 2. Check for existing logistics provider application
+    let provider = await this.providerRepo.findOne({
+      where: { userId: effectiveUserId },
+      relations: { user: true },
+    });
+
+    if (provider) {
+      provider.businessName = dto.businessName;
+      provider.contactPerson = dto.contactPerson;
+      provider.phone = dto.phone;
+      provider.email = dto.email || provider.email;
+      provider.operatingCity = dto.operatingCity;
+      provider.operatingHub = dto.operatingHub;
+      provider.businessType = dto.businessType || provider.businessType;
+      if (dto.primaryCargoTypes) provider.primaryCargoTypes = dto.primaryCargoTypes;
+      if (dto.requiredVehicleCategories) provider.requiredVehicleCategories = dto.requiredVehicleCategories;
+      provider.gstin = resolvedGstin || provider.gstin;
+      provider.pan = resolvedPan || provider.pan;
+      provider.isGstVerified = dto.isGstVerified ?? provider.isGstVerified;
+      provider.isAadhaarVerified = dto.isAadhaarVerified ?? provider.isAadhaarVerified;
+      provider.idProofUploaded = dto.idProofUploaded ?? provider.idProofUploaded;
+      provider.businessProofUploaded = dto.businessProofUploaded ?? provider.businessProofUploaded;
+      provider.accountHolder = dto.accountHolder || provider.accountHolder;
+      provider.bankName = dto.bankName || provider.bankName;
+      provider.accountNumber = dto.accountNumber || provider.accountNumber;
+      provider.ifscCode = dto.ifscCode || provider.ifscCode;
+      provider.upiId = dto.upiId || provider.upiId;
+      provider.verificationStatus = VerificationStatus.PENDING;
+      provider.rejectionReason = null;
+      return this.providerRepo.save(provider);
+    }
+
+    provider = this.providerRepo.create({
+      userId: effectiveUserId,
+      businessName: dto.businessName,
+      contactPerson: dto.contactPerson,
+      phone: dto.phone,
+      email: dto.email || null,
+      operatingCity: dto.operatingCity,
+      operatingHub: dto.operatingHub,
+      businessType: dto.businessType || 'Transporter / Fleet Broker',
+      primaryCargoTypes: dto.primaryCargoTypes || ['Agro / Grains', 'Iron & Steel', 'FMCG'],
+      requiredVehicleCategories: dto.requiredVehicleCategories || ['Open', 'Container', 'Trailer'],
+      gstin: resolvedGstin,
+      pan: resolvedPan,
+      isGstVerified: dto.isGstVerified || false,
+      isAadhaarVerified: dto.isAadhaarVerified || false,
+      idProofUploaded: dto.idProofUploaded || false,
+      businessProofUploaded: dto.businessProofUploaded || false,
+      accountHolder: dto.accountHolder || null,
+      bankName: dto.bankName || null,
+      accountNumber: dto.accountNumber || null,
+      ifscCode: dto.ifscCode || null,
+      upiId: dto.upiId || null,
+      verificationStatus: VerificationStatus.PENDING,
+    });
+
+    return this.providerRepo.save(provider);
+  }
+
+  async getMyProvider(userId?: string, phone?: string): Promise<LogisticsProvider | null> {
+    if (userId) {
+      const provider = await this.providerRepo.findOne({
+        where: { userId },
+        relations: { user: true },
+      });
+      if (provider) return provider;
+    }
+
+    if (phone) {
+      const user = await this.userRepo.findOne({ where: { phone } });
+      if (user) {
+        return this.providerRepo.findOne({
+          where: { userId: user.id },
+          relations: { user: true },
+        });
+      }
+    }
+
+    return null;
+  }
+
+  async getProviders(query?: QueryLogisticsProvidersDto): Promise<LogisticsProvider[]> {
+    const qb = this.providerRepo.createQueryBuilder('lp')
+      .leftJoinAndSelect('lp.user', 'u');
+
+    if (query?.search) {
+      const term = `%${query.search.toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(lp.businessName) LIKE :term OR LOWER(lp.contactPerson) LIKE :term OR LOWER(lp.phone) LIKE :term OR LOWER(COALESCE(lp.gstin, \'\')) LIKE :term OR LOWER(COALESCE(u.name, \'\')) LIKE :term)',
+        { term },
+      );
+    }
+
+    if (query?.verificationStatus) {
+      qb.andWhere('lp.verificationStatus = :status', { status: query.verificationStatus });
+    }
+
+    if (query?.city && query.city !== 'ALL') {
+      qb.andWhere('LOWER(lp.operatingCity) = LOWER(:city)', { city: query.city });
+    }
+
+    qb.orderBy('lp.createdAt', 'DESC');
+
+    return qb.getMany();
+  }
+
+  async getProviderById(id: string): Promise<LogisticsProvider> {
+    const provider = await this.providerRepo.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+    if (!provider) {
+      throw new NotFoundException(`Logistics provider with ID ${id} not found`);
+    }
+    return provider;
+  }
+
+  async verifyProvider(id: string, adminUserId?: string, notes?: string): Promise<LogisticsProvider> {
+    const provider = await this.getProviderById(id);
+
+    provider.verificationStatus = VerificationStatus.VERIFIED;
+    provider.reviewedBy = adminUserId || null;
+    provider.reviewedAt = new Date();
+    provider.rejectionReason = null;
+    if (notes) provider.notes = notes;
+
+    const saved = await this.providerRepo.save(provider);
+
+    try {
+      const partnerRole = await this.roleRepo.findOne({
+        where: { name: BusinessRole.PARTNER },
+      });
+      if (partnerRole) {
+        const existingRole = await this.userRoleRepo.findOne({
+          where: { userId: provider.userId, roleId: partnerRole.id },
+        });
+        if (!existingRole) {
+          const userRole = this.userRoleRepo.create({
+            userId: provider.userId,
+            roleId: partnerRole.id,
+            status: RoleAssignmentStatus.ACTIVE,
+            approvedAt: new Date(),
+            approvedBy: adminUserId || null,
+          });
+          await this.userRoleRepo.save(userRole);
+        }
+      }
+    } catch (err) {
+      this.logger.warn('Could not auto-assign PARTNER role:', err);
+    }
+
+    return saved;
+  }
+
+  async rejectProvider(id: string, adminUserId?: string, rejectionReason?: string): Promise<LogisticsProvider> {
+    const provider = await this.getProviderById(id);
+
+    provider.verificationStatus = VerificationStatus.REJECTED;
+    provider.reviewedBy = adminUserId || null;
+    provider.reviewedAt = new Date();
+    provider.rejectionReason = rejectionReason || 'KYC or business documentation could not be verified by administrator';
+
+    return this.providerRepo.save(provider);
   }
 }

@@ -18,6 +18,7 @@ import { Vehicle } from '../drivers/entities/vehicle.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { ParkingOperator } from '../parking/entities/parking-operator.entity';
 import { ParkingLocation } from '../parking/entities/parking-location.entity';
+import { LogisticsProvider } from '../logistics/entities/logistics-provider.entity';
 import { ApplyTechnicianDto } from './dto/apply-technician.dto';
 import { ApplyDriverDto } from './dto/apply-driver.dto';
 import { ApplyParkingDto } from './dto/apply-parking.dto';
@@ -46,6 +47,8 @@ export class ApplicationsService {
     private readonly driverProfileRepo: Repository<DriverProfile>,
     @InjectRepository(ParkingOperator)
     private readonly parkingOpRepo: Repository<ParkingOperator>,
+    @InjectRepository(LogisticsProvider)
+    private readonly providerRepo: Repository<LogisticsProvider>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -417,10 +420,11 @@ export class ApplicationsService {
       order: { submittedAt: 'DESC' },
     });
 
-    const [parkingOp, driverProfile, techProfile] = await Promise.all([
+    const [parkingOp, driverProfile, techProfile, logisticsProvider] = await Promise.all([
       this.parkingOpRepo.findOne({ where: { userId } }),
       this.driverProfileRepo.findOne({ where: { userId } }),
       this.techProfileRepo.findOne({ where: { userId } }),
+      this.providerRepo.findOne({ where: { userId } }),
     ]);
 
     const activeApps: any[] = [];
@@ -462,6 +466,31 @@ export class ApplicationsService {
       activeApps.push({
         ...app,
         status: liveStatus,
+      });
+    }
+
+    if (logisticsProvider) {
+      const logisStatus =
+        logisticsProvider.verificationStatus === VerificationStatus.VERIFIED
+          ? 'APPROVED'
+          : logisticsProvider.verificationStatus === VerificationStatus.REJECTED
+          ? 'REJECTED'
+          : logisticsProvider.verificationStatus === VerificationStatus.SUSPENDED
+          ? 'SUSPENDED'
+          : 'UNDER_REVIEW';
+
+      activeApps.push({
+        id: logisticsProvider.id,
+        userId: logisticsProvider.userId,
+        requestedRole: 'LOGISTICS_PROVIDER',
+        status: logisStatus,
+        businessName: logisticsProvider.businessName,
+        contactPerson: logisticsProvider.contactPerson,
+        phone: logisticsProvider.phone,
+        email: logisticsProvider.email,
+        operatingCity: logisticsProvider.operatingCity,
+        operatingHub: logisticsProvider.operatingHub,
+        submittedAt: logisticsProvider.createdAt,
       });
     }
 

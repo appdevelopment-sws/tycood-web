@@ -16,6 +16,8 @@ import { DriverProfile } from '../../drivers/entities/driver-profile.entity';
 import { ParkingOperator } from '../../parking/entities/parking-operator.entity';
 import { Vehicle } from '../../drivers/entities/vehicle.entity';
 import { Booking } from '../../bookings/entities/booking.entity';
+import { LogisticsProvider } from '../../logistics/entities/logistics-provider.entity';
+import { Review } from '../../reviews/entities/review.entity';
 
 @Entity('users')
 export class User {
@@ -147,15 +149,18 @@ export class User {
   @OneToOne(() => ParkingOperator, (operator) => operator.user)
   parkingOperator: ParkingOperator;
 
+  @OneToOne(() => LogisticsProvider, (provider) => provider.user)
+  logisticsProvider: LogisticsProvider;
+
   @OneToMany(() => Vehicle, (vehicle) => vehicle.owner)
   ownedVehicles: Vehicle[];
 
   @OneToMany(() => Booking, (booking) => booking.user)
   bookings: Booking[];
 
-  @OneToMany('Review', 'reviewer')
-  givenReviews: any[];
+  @OneToMany(() => Review, (review) => review.reviewer)
+  givenReviews: Review[];
 
-  @OneToMany('Review', 'targetUser')
-  receivedReviews: any[];
+  @OneToMany(() => Review, (review) => review.targetUser)
+  receivedReviews: Review[];
 }

@@ -23,6 +23,7 @@ import { TechnicianBooking } from '../modules/technicians/entities/technician-bo
 import { TruckType } from '../modules/logistics/entities/truck-type.entity';
 import { Load } from '../modules/logistics/entities/load.entity';
 import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
+import { LogisticsProvider } from '../modules/logistics/entities/logistics-provider.entity';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -53,6 +54,7 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       TruckType,
       Load,
       LoadBid,
+      LogisticsProvider,
     ]),
   ],
   providers: [InitialSeedService],

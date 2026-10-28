@@ -19,6 +19,8 @@ import { ApplicationsService } from './applications.service';
 import { ApplyTechnicianDto } from './dto/apply-technician.dto';
 import { ApplyDriverDto } from './dto/apply-driver.dto';
 import { ApplyParkingDto } from './dto/apply-parking.dto';
+import { ApplyLogisticsProviderDto } from '../logistics/dto/logistics-provider.dto';
+import { LogisticsService } from '../logistics/logistics.service';
 import { ReviewApplicationDto } from './dto/review-application.dto';
 import { QueryApplicationsDto } from './dto/query-applications.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -33,7 +35,10 @@ import { CurrentUserDto } from '../../common/interfaces/current-user.interface';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('applications')
 export class ApplicationsController {
-  constructor(private readonly appService: ApplicationsService) {}
+  constructor(
+    private readonly appService: ApplicationsService,
+    private readonly logisticsService: LogisticsService,
+  ) {}
 
   @Post('technician')
   @ApiOperation({ summary: 'Submit application to become an Automotive Technician' })
@@ -63,6 +68,16 @@ export class ApplicationsController {
     @Body() dto: ApplyParkingDto,
   ) {
     return this.appService.applyParking(user.userId, dto);
+  }
+
+  @Post('logistics')
+  @ApiOperation({ summary: 'Submit application to become a Logistics Load Provider' })
+  @ApiResponse({ status: 201, description: 'Logistics provider application submitted for review' })
+  async applyLogistics(
+    @CurrentUser() user: CurrentUserDto,
+    @Body() dto: ApplyLogisticsProviderDto,
+  ) {
+    return this.logisticsService.applyProvider(user?.userId, dto);
   }
 
   @Get('my')

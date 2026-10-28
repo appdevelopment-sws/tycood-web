@@ -82,6 +82,11 @@ export const queryKeys = {
     list: (filters?: Record<string, any>) => ['loads', 'list', filters] as const,
     detail: (id?: string) => ['loads', 'detail', id] as const,
   },
+  logisticsPartners: {
+    all: ['logisticsPartners'] as const,
+    list: (filters?: Record<string, any>) => ['logisticsPartners', 'list', filters] as const,
+    detail: (id?: string) => ['logisticsPartners', 'detail', id] as const,
+  },
 } as const
 
 

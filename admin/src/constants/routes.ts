@@ -9,6 +9,7 @@ export const ROUTES = {
   CABS_TYPE: "/cabs-type",
   TRUCK_TYPES: "/truck-types",
   LOADS: "/loads",
+  LOGISTICS_PARTNERS: "/logistics-partners",
   ROUTES: "/routes",
   STATIONS: "/stations",
   SCHEDULES: "/schedules",
@@ -74,6 +75,13 @@ export const SIDEBAR_NAVIGATION: NavSection[] = [
         title: "Freight Cargo Loads",
         path: ROUTES.LOADS,
         iconName: "Package",
+        resourcePermission: "buses:read",
+      },
+      {
+        id: "logistics-partners",
+        title: "Logistics Partners",
+        path: ROUTES.LOGISTICS_PARTNERS,
+        iconName: "Building2",
         resourcePermission: "buses:read",
       },
       {

@@ -67,6 +67,22 @@ export class QueryLoadsDto {
   @IsNumber()
   minTons?: number;
 
+  @ApiPropertyOptional({ description: 'Exact body length in feet (e.g. 19, 22, 28, 40)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lengthFt?: number;
+
+  @ApiPropertyOptional({ description: 'Filter by specific truck type ID' })
+  @IsOptional()
+  @IsString()
+  truckTypeId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by capacity/tonnage text (e.g. 8 - 11 Ton, 12 - 15 Ton)' })
+  @IsOptional()
+  @IsString()
+  capacityRange?: string;
+
   @ApiPropertyOptional({ enum: LoadStatus })
   @IsOptional()
   @IsEnum(LoadStatus)

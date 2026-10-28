@@ -9,6 +9,8 @@ import { Vehicle } from '../drivers/entities/vehicle.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { ParkingOperator } from '../parking/entities/parking-operator.entity';
 import { ParkingLocation } from '../parking/entities/parking-location.entity';
+import { LogisticsProvider } from '../logistics/entities/logistics-provider.entity';
+import { LogisticsModule } from '../logistics/logistics.module';
 import { UsersModule } from '../users/users.module';
 import { ApplicationsService } from './applications.service';
 import { ApplicationsController } from './applications.controller';
@@ -25,8 +27,10 @@ import { ApplicationsController } from './applications.controller';
       DriverVehicle,
       ParkingOperator,
       ParkingLocation,
+      LogisticsProvider,
     ]),
     UsersModule,
+    LogisticsModule,
   ],
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
