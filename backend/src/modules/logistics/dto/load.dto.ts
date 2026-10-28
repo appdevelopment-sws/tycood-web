@@ -147,10 +147,10 @@ export class CreateLoadDto {
   @IsString()
   transporterPhone?: string;
 
-  @ApiPropertyOptional({ example: 3.0 })
+  @ApiPropertyOptional({ example: 4.5, default: 4.5 })
   @IsOptional()
   @IsNumber()
-  transporterRating?: number;
+  transporterRating?: number = 4.5;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

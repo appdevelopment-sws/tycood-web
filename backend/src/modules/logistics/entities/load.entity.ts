@@ -14,8 +14,13 @@ import { TruckType } from './truck-type.entity';
 import { LoadBid } from './load-bid.entity';
 
 const numericTransformer = {
-  to: (value?: number | null) => (value !== undefined && value !== null ? value : null),
-  from: (value?: string | null) => (value ? parseFloat(value) : null),
+  to: (value?: number | string | null) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    return typeof value === 'string' ? parseFloat(value) : value;
+  },
+  from: (value?: string | null) =>
+    value !== null && value !== undefined ? parseFloat(value) : null,
 };
 
 @Entity('loads')
@@ -185,7 +190,8 @@ export class Load {
     type: 'decimal',
     precision: 3,
     scale: 1,
-    default: 3.0,
+    default: 4.5,
+    nullable: true,
     transformer: numericTransformer,
   })
   transporterRating: number;

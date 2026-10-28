@@ -11,9 +11,13 @@ import { TruckBodyType } from '../enums/logistics.enums';
 import { Load } from './load.entity';
 
 const numericTransformer = {
-  to: (value?: number | null) =>
-    value !== undefined && value !== null ? value : null,
-  from: (value?: string | null) => (value ? parseFloat(value) : null),
+  to: (value?: number | string | null) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    return typeof value === 'string' ? parseFloat(value) : value;
+  },
+  from: (value?: string | null) =>
+    value !== null && value !== undefined ? parseFloat(value) : null,
 };
 
 @Entity('truck_types')

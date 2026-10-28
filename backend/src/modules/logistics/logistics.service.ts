@@ -222,6 +222,17 @@ export class LogisticsService implements OnModuleInit {
     const entity = this.loadRepo.create({
       ...dto,
       loadNumber,
+      transporterRating:
+        dto.transporterRating !== undefined && dto.transporterRating !== null
+          ? Number(dto.transporterRating)
+          : 4.5,
+      isTransporterVerified:
+        dto.isTransporterVerified !== undefined
+          ? dto.isTransporterVerified
+          : true,
+      transporterName: dto.transporterName || 'Verified Shipper',
+      transporterCompany: dto.transporterCompany || 'FastFreight Logistics',
+      transporterPhone: dto.transporterPhone || '+91 98765 43210',
     });
 
     return this.loadRepo.save(entity);
@@ -800,53 +811,6 @@ export class LogisticsService implements OnModuleInit {
 
       await this.loadRepo.save(initialLoads.map((l) => this.loadRepo.create(l)));
       this.logger.log('Seeded Indian Freight Logistics Truck Types and Loads successfully');
-
-      const providerCount = await this.providerRepo.count();
-      if (providerCount === 0) {
-        let sampleUser = await this.userRepo.findOne({ where: { phone: '+91 98765 43210' } });
-        if (!sampleUser) {
-          sampleUser = await this.userRepo.findOne({ where: { email: 'admin@cabbooking.com' } });
-        }
-        if (!sampleUser) {
-          sampleUser = this.userRepo.create({
-            name: 'Test Transporter',
-            phone: '+91 98765 43210',
-            email: 'transporter@testfreight.com',
-            city: 'Patna',
-            status: 'ACTIVE',
-            isActive: true,
-          });
-          sampleUser = await this.userRepo.save(sampleUser);
-        }
-
-        const initialProvider = this.providerRepo.create({
-          userId: sampleUser.id,
-          businessName: 'test Freight Lines',
-          contactPerson: 'test',
-          phone: sampleUser.phone || '+91 98765 43210',
-          email: sampleUser.email || 'transporter@testfreight.com',
-          operatingCity: 'Patna',
-          operatingHub: 'Transport Nagar, Kumhrar, Patna',
-          businessType: 'Transporter / Fleet Broker',
-          primaryCargoTypes: ['Agro / Grains', 'Iron & Steel', 'FMCG'],
-          requiredVehicleCategories: ['Open', 'Container', 'Trailer'],
-          gstin: '123123123',
-          pan: 'AAACR4829K',
-          isGstVerified: true,
-          isAadhaarVerified: true,
-          idProofUploaded: true,
-          businessProofUploaded: true,
-          accountHolder: 'test Freight Lines',
-          bankName: 'State Bank of India',
-          accountNumber: '382910482910',
-          ifscCode: 'SBIN0001234',
-          upiId: 'freight@upi',
-          verificationStatus: VerificationStatus.PENDING,
-        });
-
-        await this.providerRepo.save(initialProvider);
-        this.logger.log('Seeded initial pending logistics provider: test Freight Lines');
-      }
     } catch (err) {
       this.logger.error('Failed to seed logistics data:', err);
     }
