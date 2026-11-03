@@ -446,6 +446,7 @@ export class ApplicationsService {
       }
 
       let liveStatus: string = app.status;
+      let effectiveRejectionReason: string | null = app.rejectionReason;
       if (
         app.requestedRole === ProfessionalRole.PARKING_OPERATOR &&
         parkingOp?.verificationStatus === VerificationStatus.SUSPENDED
@@ -457,6 +458,14 @@ export class ApplicationsService {
       ) {
         liveStatus = 'SUSPENDED';
       } else if (
+        app.requestedRole === ProfessionalRole.DRIVER &&
+        driverProfile?.verificationStatus === VerificationStatus.REJECTED
+      ) {
+        liveStatus = 'REJECTED';
+        if (driverProfile?.rejectionReason) {
+          effectiveRejectionReason = driverProfile.rejectionReason;
+        }
+      } else if (
         app.requestedRole === ProfessionalRole.TECHNICIAN &&
         techProfile?.verificationStatus === VerificationStatus.SUSPENDED
       ) {
@@ -466,6 +475,7 @@ export class ApplicationsService {
       activeApps.push({
         ...app,
         status: liveStatus,
+        rejectionReason: effectiveRejectionReason,
       });
     }
 
@@ -588,7 +598,7 @@ export class ApplicationsService {
           await manager.update(
             DriverProfile,
             { userId: app.userId },
-            { verificationStatus: VerificationStatus.VERIFIED },
+            { verificationStatus: VerificationStatus.VERIFIED, rejectionReason: null },
           );
         } else if (app.requestedRole === ProfessionalRole.PARKING_OPERATOR) {
           const operator = await manager.findOne(ParkingOperator, { where: { userId: app.userId } });
@@ -615,7 +625,10 @@ export class ApplicationsService {
           await manager.update(
             DriverProfile,
             { userId: app.userId },
-            { verificationStatus: VerificationStatus.REJECTED },
+            {
+              verificationStatus: VerificationStatus.REJECTED,
+              rejectionReason: dto.rejectionReason || 'Rejected by platform admin',
+            },
           );
         } else if (app.requestedRole === ProfessionalRole.PARKING_OPERATOR) {
           await manager.update(

@@ -317,6 +317,7 @@ export class DriversService {
 
     return this.dataSource.transaction(async (manager) => {
       driver.verificationStatus = VerificationStatus.VERIFIED;
+      driver.rejectionReason = null;
       const savedDriver = await manager.save(driver);
 
       // Assign DRIVER role to user
@@ -343,19 +344,19 @@ export class DriversService {
         }
       }
 
-      // Update any pending applications
+      // Update any pending / under review applications
       await manager.update(
         ProfessionalApplication,
         {
           userId: driver.userId,
           requestedRole: ProfessionalRole.DRIVER,
-          status: ApplicationStatus.PENDING,
         },
         {
           status: ApplicationStatus.APPROVED,
           reviewedAt: new Date(),
           reviewedBy: adminId,
           notes: notes || 'Verified by admin',
+          rejectionReason: null,
         },
       );
 
@@ -373,6 +374,7 @@ export class DriversService {
 
     return this.dataSource.transaction(async (manager) => {
       driver.verificationStatus = VerificationStatus.REJECTED;
+      driver.rejectionReason = rejectionReason || 'Rejected by platform admin';
       const savedDriver = await manager.save(driver);
 
       await manager.update(
@@ -380,7 +382,6 @@ export class DriversService {
         {
           userId: driver.userId,
           requestedRole: ProfessionalRole.DRIVER,
-          status: ApplicationStatus.PENDING,
         },
         {
           status: ApplicationStatus.REJECTED,

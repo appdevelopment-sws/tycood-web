@@ -185,7 +185,10 @@ export const DriversPage = () => {
                   size="sm"
                   variant="outline"
                   className="h-8 gap-1 border-rose-200 px-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                  onClick={() => rejectDisclosure.onOpen(row)}
+                  onClick={() => {
+                    setRejectReason("Documents could not be verified. Please re-upload clear photos of your Driving License and RC.")
+                    rejectDisclosure.onOpen(row)
+                  }}
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   Reject
@@ -236,24 +239,64 @@ export const DriversPage = () => {
         open={drawerDisclosure.isOpen}
         onClose={drawerDisclosure.onClose}
         driver={drawerDisclosure.data}
+        onVerify={(id) => verifyMutation.mutate(id)}
+        onReject={(driver) => {
+          setRejectReason("Documents could not be verified. Please re-upload clear photos of your Driving License and RC.")
+          rejectDisclosure.onOpen(driver)
+        }}
+        isVerifying={verifyMutation.isPending}
       />
 
-      {/* Reject Dialog */}
+      {/* Reject Dialog with explicit reason input */}
       <ConfirmDialog
         open={rejectDisclosure.isOpen}
-        onOpenChange={rejectDisclosure.onClose}
+        onOpenChange={(open) => {
+          if (!open) setRejectReason("")
+          rejectDisclosure.onClose()
+        }}
         title="Reject Driver Application"
-        description={`Reject registration for driver "${rejectDisclosure.data?.name}" (${rejectDisclosure.data?.licenseNumber})?`}
+        description={`State the exact reason for rejecting driver "${rejectDisclosure.data?.name}" (${rejectDisclosure.data?.licenseNumber}). The driver will see this feedback in their mobile app to fix their submission.`}
         onConfirm={() =>
           rejectMutation.mutate({
             id: rejectDisclosure.data?.id || "",
-            reason: rejectReason || "Documents could not be verified",
+            reason: rejectReason.trim() || "Documents could not be verified. Please review and re-upload.",
           })
         }
         isLoading={rejectMutation.isPending}
         confirmText="Reject Application"
         variant="danger"
-      />
+      >
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Rejection Feedback (Sent to Driver's App)
+          </label>
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="e.g. Driving License photo is blurry, please re-upload clear photo of front & back DL."
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-900 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          />
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <span className="text-[10px] text-slate-400">Quick presets:</span>
+            {[
+              "Driving license photo blurry / illegible",
+              "Vehicle RC document expired / invalid",
+              "Commercial permit copy missing",
+              "Aadhaar / ID mismatch with license",
+            ].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setRejectReason(preset)}
+                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+      </ConfirmDialog>
 
       {/* Delete Dialog */}
       <ConfirmDialog
