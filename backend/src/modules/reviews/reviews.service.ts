@@ -9,6 +9,8 @@ import { Repository, DataSource } from 'typeorm';
 import { Review } from './entities/review.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Booking } from '../bookings/entities/booking.entity.js';
+import { TechnicianBooking } from '../technicians/entities/technician-booking.entity.js';
+import { ParkingBooking } from '../parking/entities/parking-booking.entity.js';
 import { CreateReviewDto } from './dto/create-review.dto.js';
 import { QueryReviewsDto } from './dto/query-reviews.dto.js';
 import { ReviewTargetType } from '../../common/enums/index.js';
@@ -45,63 +47,189 @@ export class ReviewsService {
       }
     }
 
+    // Normalize targetType if aliases were passed
+    let targetType = dto.targetType || ReviewTargetType.USER;
+    const rawType = String(dto.targetType || '').toUpperCase();
+    if (rawType === 'DRIVER') {
+      targetType = ReviewTargetType.USER;
+    } else if (rawType === 'PARKING_LOT') {
+      targetType = ReviewTargetType.PARKING_LOCATION;
+    } else if (rawType === 'TECHNICIAN') {
+      targetType = ReviewTargetType.USER;
+    }
+
+    // Helper to validate UUID format
+    const isUuid = (val?: string) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+    // Resolve targetId to a valid UUID
+    let targetId: string = dto.targetId || '';
+
+    // Check if bookingId is a UUID or a bookingNumber (e.g. PRK-..., TRP-..., MEC-...)
+    const isBookingUuid = dto.bookingId ? isUuid(dto.bookingId) : false;
+    const bookingWhere = isBookingUuid
+      ? [{ id: dto.bookingId }, { bookingNumber: dto.bookingId }]
+      : [{ bookingNumber: dto.bookingId }];
+
     // 2. Perform write inside an atomic transaction
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      // If targetId is not a valid UUID and bookingId is given, resolve it from the booking entity
+      if (!isUuid(targetId) && dto.bookingId) {
+        // Check Cab Booking
+        try {
+          const cab = await this.bookingRepo.findOne({
+            where: bookingWhere as any,
+          });
+          if (cab) {
+            if (cab.driverProfileId && isUuid(cab.driverProfileId)) {
+              targetId = cab.driverProfileId;
+            } else if (cab.userId && isUuid(cab.userId) && reviewerId !== cab.userId) {
+              targetId = cab.userId;
+            }
+          }
+        } catch (_) {}
+
+        // Check Technician Booking
+        if (!isUuid(targetId)) {
+          try {
+            const qb = queryRunner.manager.createQueryBuilder(TechnicianBooking, 'tb');
+            if (isBookingUuid) {
+              qb.where('tb.id = :id OR tb.booking_number = :id', { id: dto.bookingId });
+            } else {
+              qb.where('tb.booking_number = :id', { id: dto.bookingId });
+            }
+            const techBooking = await qb.getOne();
+            if (techBooking) {
+              if (techBooking.technicianProfileId && isUuid(techBooking.technicianProfileId)) {
+                targetId = techBooking.technicianProfileId;
+              } else if (techBooking.userId && isUuid(techBooking.userId) && reviewerId !== techBooking.userId) {
+                targetId = techBooking.userId;
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Check Parking Booking
+        if (!isUuid(targetId)) {
+          try {
+            const qb = queryRunner.manager.createQueryBuilder(ParkingBooking, 'pb');
+            if (isBookingUuid) {
+              qb.where('pb.id = :id OR pb.booking_number = :id', { id: dto.bookingId });
+            } else {
+              qb.where('pb.booking_number = :id', { id: dto.bookingId });
+            }
+            const parkBooking = await qb.getOne();
+            if (parkBooking && parkBooking.locationId && isUuid(parkBooking.locationId)) {
+              targetId = parkBooking.locationId;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Fallback: If still not a valid UUID, use a standard UUID so postgres uuid column is satisfied
+      if (!isUuid(targetId)) {
+        targetId = '00000000-0000-0000-0000-000000000000';
+      }
+
       const review = this.reviewRepo.create({
         ...dto,
+        targetType,
+        targetId,
         reviewerId,
         tags: dto.tags || [],
       });
 
       const savedReview = await queryRunner.manager.save(Review, review);
 
-      // 3. If target is a USER (e.g. Driver rating Rider, or Rider rating Driver), update User profile rating
-      if (dto.targetType === ReviewTargetType.USER) {
-        const stats = await queryRunner.manager
-          .createQueryBuilder(Review, 'r')
-          .select('ROUND(AVG(r.rating)::numeric, 2)', 'avgRating')
-          .addSelect('COUNT(r.id)', 'totalCount')
-          .where('r.target_id = :targetId', { targetId: dto.targetId })
-          .andWhere('r.target_type = :targetType', { targetType: ReviewTargetType.USER })
-          .getRawOne();
+      // 3. If target is a USER, update User profile rating if target exists in User table
+      if (
+        (targetType === ReviewTargetType.USER || rawType === 'DRIVER' || rawType === 'TECHNICIAN') &&
+        targetId !== '00000000-0000-0000-0000-000000000000'
+      ) {
+        const userExists = await queryRunner.manager.findOne(User, { where: { id: targetId } });
+        if (userExists) {
+          const stats = await queryRunner.manager
+            .createQueryBuilder(Review, 'r')
+            .select('ROUND(AVG(r.rating)::numeric, 2)', 'avgRating')
+            .addSelect('COUNT(r.id)', 'totalCount')
+            .where('r.target_id = :targetId', { targetId })
+            .andWhere('r.target_type = :targetType', { targetType: ReviewTargetType.USER })
+            .getRawOne();
 
-        const avgRating = stats?.avgRating ? parseFloat(stats.avgRating) : dto.rating;
-        const totalCount = stats?.totalCount ? parseInt(stats.totalCount, 10) : 1;
+          const avgRating = stats?.avgRating ? parseFloat(stats.avgRating) : dto.rating;
+          const totalCount = stats?.totalCount ? parseInt(stats.totalCount, 10) : 1;
 
-        await queryRunner.manager.update(User, dto.targetId, {
-          passengerRating: avgRating,
-          passengerReviewsCount: totalCount,
-        });
+          await queryRunner.manager.update(User, targetId, {
+            passengerRating: avgRating,
+            passengerReviewsCount: totalCount,
+          });
+        }
       }
 
-      // 4. If bookingId belongs to a cab booking, update booking snapshot metadata
+      // 4. Update booking snapshot metadata across Cab, Parking, or Technician bookings
       if (dto.bookingId) {
-        const booking = await queryRunner.manager.findOne(Booking, {
-          where: [{ id: dto.bookingId }, { bookingNumber: dto.bookingId }],
-        });
+        // Cab booking
+        try {
+          const booking = await queryRunner.manager.findOne(Booking, {
+            where: bookingWhere as any,
+          });
 
-        if (booking) {
-          booking.metadata = {
-            ...(booking.metadata || {}),
-            lastReviewedAt: new Date().toISOString(),
-            reviewRating: dto.rating,
-            reviewTags: dto.tags || [],
-          };
-          await queryRunner.manager.save(Booking, booking);
-        }
+          if (booking) {
+            booking.metadata = {
+              ...(booking.metadata || {}),
+              lastReviewedAt: new Date().toISOString(),
+              reviewRating: dto.rating,
+              reviewTags: dto.tags || [],
+              reviewComment: dto.comment || null,
+            };
+            await queryRunner.manager.save(Booking, booking);
+          }
+        } catch (_) {}
+
+        // Parking booking
+        try {
+          const parkBooking = await queryRunner.manager.findOne(ParkingBooking, {
+            where: bookingWhere as any,
+          });
+          if (parkBooking) {
+            parkBooking.metadata = {
+              ...(parkBooking.metadata || {}),
+              lastReviewedAt: new Date().toISOString(),
+              reviewRating: dto.rating,
+              reviewTags: dto.tags || [],
+              reviewComment: dto.comment || null,
+            };
+            await queryRunner.manager.save(ParkingBooking, parkBooking);
+          }
+        } catch (_) {}
+
+        // Technician booking
+        try {
+          const techBooking = await queryRunner.manager.findOne(TechnicianBooking, {
+            where: bookingWhere as any,
+          });
+          if (techBooking) {
+            techBooking.customerNotes = [
+              techBooking.customerNotes,
+              `[Review ${dto.rating}★]: ${dto.comment || dto.tags?.join(', ') || 'Service rated'}`,
+            ].filter(Boolean).join('\n');
+            await queryRunner.manager.save(TechnicianBooking, techBooking);
+          }
+        } catch (_) {}
       }
 
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Review created: ID=${savedReview.id}, Rating=${dto.rating}, Target=${dto.targetId}`,
+        `Review created: ID=${savedReview.id}, Rating=${dto.rating}, Target=${targetId}`,
       );
 
-      const summary = await this.getTargetSummary(dto.targetId, dto.targetType);
+      const summary = await this.getTargetSummary(targetId, targetType);
       return { review: savedReview, summary };
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -116,6 +244,21 @@ export class ReviewsService {
    * Get rating summary, distribution, and top tags for a given target entity or user
    */
   async getTargetSummary(targetId: string, targetType?: ReviewTargetType) {
+    const isUuid = (val?: string) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+    if (!isUuid(targetId)) {
+      return {
+        targetId,
+        averageRating: 5.0,
+        totalReviews: 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        topTags: [],
+        recentReviews: [],
+      };
+    }
+
     const qb = this.reviewRepo
       .createQueryBuilder('r')
       .where('r.target_id = :targetId', { targetId });

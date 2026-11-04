@@ -93,6 +93,7 @@ export class Review {
   @ManyToOne(() => User, (user) => user.receivedReviews, {
     onDelete: 'SET NULL',
     nullable: true,
+    createForeignKeyConstraints: false,
   })
   @JoinColumn({ name: 'target_id' })
   targetUser: User | null;

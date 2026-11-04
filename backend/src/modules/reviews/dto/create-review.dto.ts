@@ -36,17 +36,19 @@ export class CreateReviewDto {
   @ApiProperty({
     enum: ReviewTargetType,
     example: ReviewTargetType.USER,
-    description: 'Type of target being reviewed (USER, VEHICLE, PARKING_LOCATION, etc.)',
+    description: 'Type of target being reviewed (USER, DRIVER, VEHICLE, PARKING_LOCATION, TECHNICIAN, etc.)',
   })
+  @IsOptional()
   @IsEnum(ReviewTargetType)
-  targetType: ReviewTargetType;
+  targetType?: ReviewTargetType;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'd8b48869-2f5f-4a0b-8d7b-9442fa605417',
     description: 'UUID of target entity or user being rated (e.g. rider user ID)',
   })
-  @IsUUID()
-  targetId: string;
+  @IsOptional()
+  @IsString()
+  targetId?: string;
 
   @ApiPropertyOptional({
     example: 'TRP-12345678',

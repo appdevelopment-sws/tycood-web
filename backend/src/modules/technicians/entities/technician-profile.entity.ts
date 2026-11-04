@@ -97,6 +97,9 @@ export class TechnicianProfile {
   })
   verificationStatus: VerificationStatus;
 
+  @Column({ name: 'rejection_reason', type: 'text', nullable: true })
+  rejectionReason: string | null;
+
   @Index()
   @Column({
     name: 'availability_status',

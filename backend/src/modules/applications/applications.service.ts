@@ -65,8 +65,10 @@ export class ApplicationsService {
     const existing = await this.findActiveApplication(userId, ProfessionalRole.TECHNICIAN);
 
     return this.dataSource.transaction(async (manager) => {
-      // 1. Create or update TechnicianProfile with PENDING verification
+      // 1. Create or update TechnicianProfile
       let techProfile = await manager.findOne(TechnicianProfile, { where: { userId } });
+      const isAlreadyVerified = techProfile?.verificationStatus === VerificationStatus.VERIFIED;
+
       if (techProfile) {
         techProfile.workshopName = dto.workshopName || techProfile.workshopName;
         techProfile.specializations = dto.specializations;
@@ -86,7 +88,12 @@ export class ApplicationsService {
         techProfile.accountNumber = dto.accountNumber || techProfile.accountNumber;
         techProfile.ifscCode = dto.ifscCode || techProfile.ifscCode;
         techProfile.upiId = dto.upiId || techProfile.upiId;
-        techProfile.verificationStatus = VerificationStatus.PENDING;
+        techProfile.verificationStatus = isAlreadyVerified
+          ? VerificationStatus.VERIFIED
+          : VerificationStatus.PENDING;
+        if (!isAlreadyVerified) {
+          techProfile.rejectionReason = null;
+        }
       } else {
         techProfile = manager.create(TechnicianProfile, {
           userId,
@@ -149,7 +156,8 @@ export class ApplicationsService {
 
       // 2. Create or update application record
       if (existing) {
-        existing.status = ApplicationStatus.PENDING;
+        existing.status = isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING;
+        existing.rejectionReason = isAlreadyVerified ? null : existing.rejectionReason;
         existing.submittedAt = new Date();
         return manager.save(existing);
       }
@@ -157,7 +165,7 @@ export class ApplicationsService {
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.TECHNICIAN,
-        status: ApplicationStatus.PENDING,
+        status: isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING,
         submittedAt: new Date(),
       });
       return manager.save(app);
@@ -170,6 +178,8 @@ export class ApplicationsService {
     return this.dataSource.transaction(async (manager) => {
       // 1. Create or update DriverProfile
       let driverProfile = await manager.findOne(DriverProfile, { where: { userId } });
+      const isAlreadyVerified = driverProfile?.verificationStatus === VerificationStatus.VERIFIED;
+
       if (driverProfile) {
         driverProfile.licenseNumber = dto.licenseNumber;
         driverProfile.licenseExpiry = dto.licenseExpiry || driverProfile.licenseExpiry;
@@ -182,7 +192,12 @@ export class ApplicationsService {
           dto.policeDeclarationAccepted ?? driverProfile.policeDeclarationAccepted;
         driverProfile.codeOfConductAccepted =
           dto.codeOfConductAccepted ?? driverProfile.codeOfConductAccepted;
-        driverProfile.verificationStatus = VerificationStatus.PENDING;
+        driverProfile.verificationStatus = isAlreadyVerified
+          ? VerificationStatus.VERIFIED
+          : VerificationStatus.PENDING;
+        if (!isAlreadyVerified) {
+          driverProfile.rejectionReason = null;
+        }
       } else {
         driverProfile = manager.create(DriverProfile, {
           userId,
@@ -200,12 +215,25 @@ export class ApplicationsService {
       }
       const savedDriver = await manager.save(driverProfile);
 
-      // 2. Register vehicle if provided
+      // 2. Register or update vehicle if provided
       if (dto.vehiclePlateNumber) {
         let vehicle = await manager.findOne(Vehicle, {
           where: { registrationNumber: dto.vehiclePlateNumber.toUpperCase() },
         });
-        if (!vehicle) {
+        if (vehicle) {
+          vehicle.vehicleCategory = dto.vehicleCategory || vehicle.vehicleCategory;
+          vehicle.make = dto.vehicleMakeModel?.split(' ')[0] || vehicle.make;
+          vehicle.model = dto.vehicleMakeModel || vehicle.model;
+          vehicle.manufacturingYear = dto.manufacturingYear || vehicle.manufacturingYear;
+          vehicle.fuelType = dto.fuelType || vehicle.fuelType;
+          vehicle.seatingCapacity = dto.seatingCapacity || vehicle.seatingCapacity;
+          vehicle.rcNumber = dto.rcNumber || vehicle.rcNumber;
+          vehicle.insurancePolicyNumber = dto.insurancePolicyNumber || vehicle.insurancePolicyNumber;
+          vehicle.permitType = dto.permitType || vehicle.permitType;
+          vehicle.rcPhotoUploaded = dto.rcPhotoUploaded ?? vehicle.rcPhotoUploaded;
+          vehicle.insuranceDocUploaded = dto.insuranceDocUploaded ?? vehicle.insuranceDocUploaded;
+          vehicle = await manager.save(vehicle);
+        } else {
           vehicle = manager.create(Vehicle, {
             ownerUserId: userId,
             vehicleCategory: dto.vehicleCategory || 'Sedan Prime',
@@ -242,7 +270,8 @@ export class ApplicationsService {
 
       // 3. Create or update application record
       if (existing) {
-        existing.status = ApplicationStatus.PENDING;
+        existing.status = isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING;
+        existing.rejectionReason = isAlreadyVerified ? null : existing.rejectionReason;
         existing.submittedAt = new Date();
         return manager.save(existing);
       }
@@ -250,7 +279,7 @@ export class ApplicationsService {
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.DRIVER,
-        status: ApplicationStatus.PENDING,
+        status: isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING,
         submittedAt: new Date(),
       });
       return manager.save(app);
@@ -263,6 +292,8 @@ export class ApplicationsService {
     return this.dataSource.transaction(async (manager) => {
       // 1. Create or update ParkingOperator profile
       let operator = await manager.findOne(ParkingOperator, { where: { userId } });
+      const isAlreadyVerified = operator?.verificationStatus === VerificationStatus.VERIFIED;
+
       if (operator) {
         operator.businessType = dto.businessType || operator.businessType;
         operator.facilityName = dto.facilityName || operator.facilityName;
@@ -277,7 +308,9 @@ export class ApplicationsService {
         operator.bankName = dto.bankName || operator.bankName;
         operator.accountNumber = dto.accountNumber || operator.accountNumber;
         operator.ifscCode = dto.ifscCode || operator.ifscCode;
-        operator.verificationStatus = VerificationStatus.PENDING;
+        operator.verificationStatus = isAlreadyVerified
+          ? VerificationStatus.VERIFIED
+          : VerificationStatus.PENDING;
       } else {
         operator = manager.create(ParkingOperator, {
           userId,
@@ -299,45 +332,77 @@ export class ApplicationsService {
       }
       const savedOperator = await manager.save(operator);
 
-      // 2. Create initial parking location
+      // 2. Create or update parking location
       const totalCapacity = (dto.carSlotsTotal || 45) + (dto.bikeSlotsTotal || 35);
-      const location = manager.create(ParkingLocation, {
-        operatorId: savedOperator.id,
-        name: dto.facilityName || `${dto.ownerName} Facility`,
-        address: dto.address,
-        landmark: dto.landmark,
-        latitude: dto.latitude ?? dto.landmarkLatitude ?? null,
-        longitude: dto.longitude ?? dto.landmarkLongitude ?? null,
-        city: dto.city,
-        pincode: dto.pincode,
-        facilityStructure: dto.facilityStructure || 'Covered Basement & Ground',
-        capacity: totalCapacity,
-        carSlotsTotal: dto.carSlotsTotal || 45,
-        bikeSlotsTotal: dto.bikeSlotsTotal || 35,
-        evChargingPoints: dto.evChargingPoints || 4,
-        availableSpaces: totalCapacity,
-        availableCarSlots: dto.carSlotsTotal || 45,
-        availableBikeSlots: dto.bikeSlotsTotal || 35,
-        isOpen24x7: dto.isOpen24x7 ?? true,
-        operatingHours: dto.operatingHours || '24x7 Open (Mon - Sun)',
-        operatingSchedule: dto.operatingSchedule ?? null,
-        carHourlyRate: dto.carHourlyRate || 30.0,
-        carDailyRate: dto.carDailyRate || 250.0,
-        bikeHourlyRate: dto.bikeHourlyRate || 15.0,
-        amenities: dto.amenities || [
-          '24/7 Security Guard',
-          'CCTV Surveillance',
-          'Covered Shade',
-          'Automated Barrier Gate',
-        ],
-        addonServices: dto.addonServices || [],
-        status: ParkingLocationStatus.INACTIVE, // Unapproved until operator is verified
+      let location = await manager.findOne(ParkingLocation, {
+        where: { operatorId: savedOperator.id },
       });
-      await manager.save(location);
+
+      if (location) {
+        location.name = dto.facilityName || location.name;
+        location.address = dto.address || location.address;
+        location.landmark = dto.landmark || location.landmark;
+        location.latitude = dto.latitude ?? dto.landmarkLatitude ?? location.latitude;
+        location.longitude = dto.longitude ?? dto.landmarkLongitude ?? location.longitude;
+        location.city = dto.city || location.city;
+        location.pincode = dto.pincode || location.pincode;
+        location.facilityStructure = dto.facilityStructure || location.facilityStructure;
+        location.capacity = totalCapacity;
+        location.carSlotsTotal = dto.carSlotsTotal || location.carSlotsTotal;
+        location.bikeSlotsTotal = dto.bikeSlotsTotal || location.bikeSlotsTotal;
+        location.evChargingPoints = dto.evChargingPoints ?? location.evChargingPoints;
+        location.isOpen24x7 = dto.isOpen24x7 ?? location.isOpen24x7;
+        location.operatingHours = dto.operatingHours || location.operatingHours;
+        location.operatingSchedule = dto.operatingSchedule ?? location.operatingSchedule;
+        location.carHourlyRate = dto.carHourlyRate || location.carHourlyRate;
+        location.carDailyRate = dto.carDailyRate || location.carDailyRate;
+        location.bikeHourlyRate = dto.bikeHourlyRate || location.bikeHourlyRate;
+        location.amenities = dto.amenities || location.amenities;
+        location.addonServices = dto.addonServices || location.addonServices;
+        location.status = isAlreadyVerified
+          ? ParkingLocationStatus.ACTIVE
+          : ParkingLocationStatus.INACTIVE;
+        await manager.save(location);
+      } else {
+        location = manager.create(ParkingLocation, {
+          operatorId: savedOperator.id,
+          name: dto.facilityName || `${dto.ownerName} Facility`,
+          address: dto.address,
+          landmark: dto.landmark,
+          latitude: dto.latitude ?? dto.landmarkLatitude ?? null,
+          longitude: dto.longitude ?? dto.landmarkLongitude ?? null,
+          city: dto.city,
+          pincode: dto.pincode,
+          facilityStructure: dto.facilityStructure || 'Covered Basement & Ground',
+          capacity: totalCapacity,
+          carSlotsTotal: dto.carSlotsTotal || 45,
+          bikeSlotsTotal: dto.bikeSlotsTotal || 35,
+          evChargingPoints: dto.evChargingPoints || 4,
+          availableSpaces: totalCapacity,
+          availableCarSlots: dto.carSlotsTotal || 45,
+          availableBikeSlots: dto.bikeSlotsTotal || 35,
+          isOpen24x7: dto.isOpen24x7 ?? true,
+          operatingHours: dto.operatingHours || '24x7 Open (Mon - Sun)',
+          operatingSchedule: dto.operatingSchedule ?? null,
+          carHourlyRate: dto.carHourlyRate || 30.0,
+          carDailyRate: dto.carDailyRate || 250.0,
+          bikeHourlyRate: dto.bikeHourlyRate || 15.0,
+          amenities: dto.amenities || [
+            '24/7 Security Guard',
+            'CCTV Surveillance',
+            'Covered Shade',
+            'Automated Barrier Gate',
+          ],
+          addonServices: dto.addonServices || [],
+          status: isAlreadyVerified ? ParkingLocationStatus.ACTIVE : ParkingLocationStatus.INACTIVE,
+        });
+        await manager.save(location);
+      }
 
       // 3. Create or update application record
       if (existing) {
-        existing.status = ApplicationStatus.PENDING;
+        existing.status = isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING;
+        existing.rejectionReason = isAlreadyVerified ? null : existing.rejectionReason;
         existing.submittedAt = new Date();
         return manager.save(existing);
       }
@@ -345,7 +410,7 @@ export class ApplicationsService {
       const app = manager.create(ProfessionalApplication, {
         userId,
         requestedRole: ProfessionalRole.PARKING_OPERATOR,
-        status: ApplicationStatus.PENDING,
+        status: isAlreadyVerified ? ApplicationStatus.APPROVED : ApplicationStatus.PENDING,
         submittedAt: new Date(),
       });
       return manager.save(app);

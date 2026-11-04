@@ -81,11 +81,12 @@ export const MechanicsPage = () => {
   const { data: bookingsData, isLoading: isLoadingBookings } = useQuery({
     queryKey: ["technician-bookings"],
     queryFn: async () => {
-      return technicianService.getBookings({ limit: 50 })
+      return technicianService.getBookings({ limit: 100 })
     },
-    enabled: activeTab === "bookings",
   })
-  const bookings = bookingsData?.data || []
+  const bookings = Array.isArray(bookingsData)
+    ? bookingsData
+    : bookingsData?.data || []
 
   // Mutations
   const verifyMutation = useMutation({
@@ -503,6 +504,11 @@ export const MechanicsPage = () => {
           >
             <CreditCard className="h-3.5 w-3.5" />
             Bookings & Quotes
+            {bookings.length > 0 && (
+              <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                {bookings.length}
+              </span>
+            )}
           </button>
         </div>
       </div>

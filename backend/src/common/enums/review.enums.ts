@@ -16,7 +16,10 @@ export enum ReviewRole {
 
 export enum ReviewTargetType {
   USER = 'USER',
+  DRIVER = 'DRIVER',
   VEHICLE = 'VEHICLE',
   PARKING_LOCATION = 'PARKING_LOCATION',
+  PARKING_LOT = 'PARKING_LOT',
+  TECHNICIAN = 'TECHNICIAN',
   SERVICE = 'SERVICE',
 }
