@@ -8,6 +8,8 @@ import type {
   CreateLoadPayload,
   UpdateLoadPayload,
   LoadFilterParams,
+  LoadCallLog,
+  LoadCallLogFilterParams,
 } from "../types/logistics"
 
 export interface PaginatedResponse<T> {
@@ -107,5 +109,23 @@ export const logisticsService = {
     return apiClient<{ success: boolean; message: string }>(`/logistics/loads/${id}`, {
       method: "DELETE",
     })
+  },
+
+  // Shipper/Transporter Call Logs for Monitoring
+  getCallLogs: async (filters?: LoadCallLogFilterParams): Promise<LoadCallLog[]> => {
+    const params = new URLSearchParams()
+    if (filters?.loadId) params.append("loadId", filters.loadId)
+    if (filters?.search) params.append("search", filters.search)
+    if (filters?.page) params.append("page", String(filters.page))
+    if (filters?.limit) params.append("limit", String(filters.limit))
+
+    const queryStr = params.toString()
+    const url = queryStr ? `/logistics/call-logs?${queryStr}` : "/logistics/call-logs"
+    const response = await apiClient<PaginatedResponse<LoadCallLog> | LoadCallLog[]>(url)
+
+    if (Array.isArray(response)) {
+      return response
+    }
+    return response.data || []
   },
 }

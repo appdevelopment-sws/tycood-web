@@ -22,6 +22,7 @@ import { Transaction } from '../modules/transactions/entities/transaction.entity
 import { TruckType } from '../modules/logistics/entities/truck-type.entity';
 import { Load } from '../modules/logistics/entities/load.entity';
 import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
+import { LoadCallLog } from '../modules/logistics/entities/load-call-log.entity';
 import { LogisticsProvider } from '../modules/logistics/entities/logistics-provider.entity';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
@@ -55,6 +56,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     TruckType,
     Load,
     LoadBid,
+    LoadCallLog,
     LogisticsProvider,
   ],
   synchronize: process.env.DB_SYNCHRONIZE === 'true',

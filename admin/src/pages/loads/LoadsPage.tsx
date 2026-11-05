@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Eye, Trash2, ArrowRight, Phone, CheckCircle2 } from "lucide-react"
+import { Plus, Pencil, Eye, Trash2, ArrowRight, Phone, PhoneCall, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/common/DataTable"
@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/common/StatusBadge"
 import { logisticsService } from "@/services/logisticsService"
 import { queryKeys } from "@/lib/queryKeys"
 import LoadDrawer from "@/components/dialog/LoadDialog"
+import LoadCallLogsDialog from "@/components/dialog/LoadCallLogsDialog"
 import type { Load, LoadFilterParams } from "@/types/logistics"
 
 const INITIAL_FILTERS: LoadFilterParams = {
@@ -33,6 +34,7 @@ export const LoadsPage = () => {
 
   const drawerDisclosure = useDisclosure<Load & { viewMode?: boolean }>()
   const deleteDisclosure = useDisclosure<Load>()
+  const callLogsDisclosure = useDisclosure<Load | null>()
 
   const { filter, handleFilter } = useSearchFilter(INITIAL_FILTERS)
 
@@ -161,6 +163,15 @@ export const LoadsPage = () => {
             <Button
               variant="ghost"
               size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-amber-600"
+              onClick={() => callLogsDisclosure.onOpen(row)}
+              title="View caller inquiries for this load"
+            >
+              <PhoneCall className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => handleOpen(row, "view")}
               title="View load details"
@@ -197,9 +208,18 @@ export const LoadsPage = () => {
         title="Freight Cargo Loads"
         description="Active freight and cargo shipments available on the driver Load Board in the user application."
         action={
-          <Button onClick={() => handleOpen(null, "create")} className="gap-2">
-            <Plus className="h-4 w-4" /> Post New Load
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => callLogsDisclosure.onOpen(null)}
+              className="gap-2"
+            >
+              <PhoneCall className="h-4 w-4 text-amber-600" /> Caller Inquiries
+            </Button>
+            <Button onClick={() => handleOpen(null, "create")} className="gap-2">
+              <Plus className="h-4 w-4" /> Post New Load
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">
@@ -239,6 +259,12 @@ export const LoadsPage = () => {
         open={drawerDisclosure.isOpen}
         onClose={drawerDisclosure.onClose}
         load={drawerDisclosure.data}
+      />
+
+      <LoadCallLogsDialog
+        open={callLogsDisclosure.isOpen}
+        onClose={callLogsDisclosure.onClose}
+        load={callLogsDisclosure.data}
       />
 
       <ConfirmDialog

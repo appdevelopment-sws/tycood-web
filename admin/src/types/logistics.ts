@@ -132,3 +132,24 @@ export interface LoadFilterParams {
   page?: number
   limit?: number
 }
+
+export interface LoadCallLog {
+  id: string
+  loadId: string
+  callerUserId?: string
+  callerName: string
+  callerPhone: string
+  loadNumber: string
+  transporterName?: string
+  transporterPhone?: string
+  source: string
+  createdAt: string
+  load?: Load
+}
+
+export interface LoadCallLogFilterParams {
+  loadId?: string
+  search?: string
+  page?: number
+  limit?: number
+}

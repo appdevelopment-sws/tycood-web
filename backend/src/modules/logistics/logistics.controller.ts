@@ -19,6 +19,7 @@ import {
 import { LogisticsService } from './logistics.service';
 import { CreateTruckTypeDto, UpdateTruckTypeDto } from './dto/truck-type.dto';
 import { CreateLoadDto, UpdateLoadDto, CreateLoadBidDto } from './dto/load.dto';
+import { CreateLoadCallLogDto, QueryLoadCallLogsDto } from './dto/call-log.dto';
 import { QueryTruckTypesDto, QueryLoadsDto } from './dto/query-logistics.dto';
 import {
   ApplyLogisticsProviderDto,
@@ -247,5 +248,29 @@ export class LogisticsController {
     @CurrentUser() admin?: CurrentUserDto,
   ) {
     return this.logisticsService.rejectProvider(id, admin?.userId, dto?.rejectionReason);
+  }
+
+  // =========================================================================
+  // CALL LOGGING & AUDIT TRAIL
+  // =========================================================================
+
+  @Post('loads/:id/call-log')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Log a call attempt to the transporter for a load' })
+  @ApiParam({ name: 'id', description: 'Load UUID' })
+  @ApiResponse({ status: 201, description: 'Call log registered successfully' })
+  async logCall(
+    @Param('id') id: string,
+    @Body() dto: CreateLoadCallLogDto,
+    @CurrentUser() user?: CurrentUserDto,
+  ) {
+    return this.logisticsService.logCall(id, dto, user);
+  }
+
+  @Get('call-logs')
+  @ApiOperation({ summary: 'Get all call logs on loads for admin monitoring' })
+  @ApiResponse({ status: 200, description: 'List of call logs' })
+  async getCallLogs(@Query() query: QueryLoadCallLogsDto) {
+    return this.logisticsService.getCallLogs(query);
   }
 }

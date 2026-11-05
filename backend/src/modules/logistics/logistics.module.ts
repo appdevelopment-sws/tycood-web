@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TruckType } from './entities/truck-type.entity';
 import { Load } from './entities/load.entity';
 import { LoadBid } from './entities/load-bid.entity';
+import { LoadCallLog } from './entities/load-call-log.entity';
 import { LogisticsProvider } from './entities/logistics-provider.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
@@ -16,6 +17,7 @@ import { LogisticsController } from './logistics.controller';
       TruckType,
       Load,
       LoadBid,
+      LoadCallLog,
       LogisticsProvider,
       User,
       UserRole,

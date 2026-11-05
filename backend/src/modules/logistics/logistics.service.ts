@@ -10,6 +10,7 @@ import { Repository, Like } from 'typeorm';
 import { TruckType } from './entities/truck-type.entity';
 import { Load } from './entities/load.entity';
 import { LoadBid } from './entities/load-bid.entity';
+import { LoadCallLog } from './entities/load-call-log.entity';
 import { LogisticsProvider } from './entities/logistics-provider.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
@@ -17,6 +18,7 @@ import { Role } from '../users/entities/role.entity';
 import { TruckBodyType, LoadStatus, PaymentTerms, BidStatus } from './enums/logistics.enums';
 import { CreateTruckTypeDto, UpdateTruckTypeDto } from './dto/truck-type.dto';
 import { CreateLoadDto, UpdateLoadDto, CreateLoadBidDto } from './dto/load.dto';
+import { CreateLoadCallLogDto, QueryLoadCallLogsDto } from './dto/call-log.dto';
 import { QueryTruckTypesDto, QueryLoadsDto } from './dto/query-logistics.dto';
 import {
   ApplyLogisticsProviderDto,
@@ -26,6 +28,7 @@ import {
 import { VerificationStatus } from '../../common/enums/verification-status.enum';
 import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
 import { BusinessRole } from '../../common/enums/business-role.enum';
+import { CurrentUserDto } from '../../common/interfaces/current-user.interface';
 
 @Injectable()
 export class LogisticsService implements OnModuleInit {
@@ -38,6 +41,8 @@ export class LogisticsService implements OnModuleInit {
     private readonly loadRepo: Repository<Load>,
     @InjectRepository(LoadBid)
     private readonly bidRepo: Repository<LoadBid>,
+    @InjectRepository(LoadCallLog)
+    private readonly callLogRepo: Repository<LoadCallLog>,
     @InjectRepository(LogisticsProvider)
     private readonly providerRepo: Repository<LogisticsProvider>,
     @InjectRepository(User)
@@ -1123,5 +1128,78 @@ export class LogisticsService implements OnModuleInit {
     provider.rejectionReason = rejectionReason || 'KYC or business documentation could not be verified by administrator';
 
     return this.providerRepo.save(provider);
+  }
+
+  // =========================================================================
+  // CALL LOGGING & AUDIT TRAIL
+  // =========================================================================
+
+  async logCall(
+    loadId: string,
+    dto: CreateLoadCallLogDto,
+    currentUser?: CurrentUserDto,
+  ): Promise<LoadCallLog> {
+    const load = await this.loadRepo.findOne({ where: { id: loadId } });
+    if (!load) {
+      throw new NotFoundException(`Cargo load with ID "${loadId}" was not found`);
+    }
+
+    const effectiveUserId = currentUser?.userId || dto.callerUserId;
+    const callerName = dto.callerName?.trim() || currentUser?.email || 'Driver / Partner';
+    const callerPhone = dto.callerPhone?.trim() || 'Not Provided';
+
+    const log = this.callLogRepo.create({
+      loadId: load.id,
+      loadNumber: load.loadNumber,
+      transporterName: load.transporterName,
+      transporterPhone: load.transporterPhone,
+      callerUserId: effectiveUserId,
+      callerName,
+      callerPhone,
+      source: dto.source || 'LOAD_DETAILS_SCREEN',
+    });
+
+    const saved = await this.callLogRepo.save(log);
+    this.logger.log(
+      `Call log recorded: "${callerName}" (${callerPhone}) called transporter for load #${load.loadNumber} (ID: ${load.id})`,
+    );
+    return saved;
+  }
+
+  async getCallLogs(query: QueryLoadCallLogsDto) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query.limit) || 30));
+    const skip = (page - 1) * limit;
+
+    const qb = this.callLogRepo
+      .createQueryBuilder('callLog')
+      .leftJoinAndSelect('callLog.load', 'load')
+      .orderBy('callLog.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (query.loadId) {
+      qb.andWhere('callLog.loadId = :loadId', { loadId: query.loadId });
+    }
+
+    if (query.search?.trim()) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(callLog.callerName) LIKE :term OR LOWER(callLog.callerPhone) LIKE :term OR LOWER(callLog.loadNumber) LIKE :term)',
+        { term },
+      );
+    }
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      data: items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }
