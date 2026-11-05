@@ -24,6 +24,7 @@ import { TruckType } from '../modules/logistics/entities/truck-type.entity';
 import { Load } from '../modules/logistics/entities/load.entity';
 import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
 import { LogisticsProvider } from '../modules/logistics/entities/logistics-provider.entity';
+import { PasswordReset } from '../modules/auth/entities/password-reset.entity';
 import { InitialSeedService } from './seeds/initial-seed.service';
 
 @Module({
@@ -55,6 +56,7 @@ import { InitialSeedService } from './seeds/initial-seed.service';
       Load,
       LoadBid,
       LogisticsProvider,
+      PasswordReset,
     ]),
   ],
   providers: [InitialSeedService],

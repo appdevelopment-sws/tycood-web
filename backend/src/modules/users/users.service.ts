@@ -242,6 +242,10 @@ export class UsersService {
     return this.findById(id);
   }
 
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.userRepo.update(id, { passwordHash });
+  }
+
   async delete(id: string): Promise<{ success: boolean; message: string }> {
     const user = await this.findById(id);
     try {
@@ -250,9 +254,13 @@ export class UsersService {
       return { success: true, message: 'User account removed successfully' };
     } catch {
       user.isActive = false;
-      user.status = 'INACTIVE';
+      user.status = 'DELETED';
+      user.email = `deleted_${Date.now()}_${user.email}`;
+      if (user.phone) {
+        user.phone = `deleted_${Date.now()}_${user.phone}`;
+      }
       await this.userRepo.save(user);
-      return { success: true, message: 'User account deactivated' };
+      return { success: true, message: 'User account deactivated and deleted successfully' };
     }
   }
 

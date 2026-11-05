@@ -24,6 +24,7 @@ import { Load } from '../modules/logistics/entities/load.entity';
 import { LoadBid } from '../modules/logistics/entities/load-bid.entity';
 import { LoadCallLog } from '../modules/logistics/entities/load-call-log.entity';
 import { LogisticsProvider } from '../modules/logistics/entities/logistics-provider.entity';
+import { PasswordReset } from '../modules/auth/entities/password-reset.entity';
 
 export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -58,6 +59,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     LoadBid,
     LoadCallLog,
     LogisticsProvider,
+    PasswordReset,
   ],
   synchronize: process.env.DB_SYNCHRONIZE === 'true',
   logging:
