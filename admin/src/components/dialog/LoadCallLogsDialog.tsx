@@ -1,13 +1,6 @@
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
-import {
-  Phone,
-  Clock,
-  User,
-  Truck,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react"
+import { Phone, Clock, User, Truck } from "lucide-react"
 
 import { FormContainer } from "@/components/formContainer"
 import { Button } from "@/components/ui/button"
