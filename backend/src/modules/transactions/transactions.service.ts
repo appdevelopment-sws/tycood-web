@@ -18,6 +18,12 @@ import { BusinessRole } from '../../common/enums/business-role.enum';
 import { ParkingBooking } from '../parking/entities/parking-booking.entity';
 import { ParkingLocation } from '../parking/entities/parking-location.entity';
 import { ParkingOperator } from '../parking/entities/parking-operator.entity';
+import { Booking } from '../bookings/entities/booking.entity';
+import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { TechnicianBooking } from '../technicians/entities/technician-booking.entity';
+import { TechnicianProfile } from '../technicians/entities/technician-profile.entity';
+import { BookingStatus } from '../../common/enums/booking-status.enum';
+import { TechnicianBookingStatus } from '../../common/enums/technician-status.enum';
 import {
   ParkingBookingStatus,
   ParkingPaymentStatus,
@@ -42,6 +48,14 @@ export class TransactionsService {
     private readonly locationRepo: Repository<ParkingLocation>,
     @InjectRepository(ParkingBooking)
     private readonly bookingRepo: Repository<ParkingBooking>,
+    @InjectRepository(Booking)
+    private readonly cabBookingRepo: Repository<Booking>,
+    @InjectRepository(DriverProfile)
+    private readonly driverProfileRepo: Repository<DriverProfile>,
+    @InjectRepository(TechnicianBooking)
+    private readonly techBookingRepo: Repository<TechnicianBooking>,
+    @InjectRepository(TechnicianProfile)
+    private readonly techProfileRepo: Repository<TechnicianProfile>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -91,8 +105,10 @@ export class TransactionsService {
    * Fetch paginated transactions and summary financial metrics for a user/partner
    */
   async getUserTransactions(userId: string, query: QueryTransactionsDto) {
-    // 1. If role is parking operator or unset, backfill/sync any legacy or existing parking bookings
+    // 1. Backfill/sync any completed bookings across parking, driver and technician roles
     await this.syncParkingBookingsToTransactions(userId);
+    await this.syncDriverBookingsToTransactions(userId);
+    await this.syncTechnicianBookingsToTransactions(userId);
 
     const qb = this.transactionRepo.createQueryBuilder('txn');
     qb.where('txn.userId = :userId', { userId });
@@ -317,6 +333,159 @@ export class TransactionsService {
     } catch (e) {
       // Non-fatal sync error; log and proceed
       // debugPrint / console.warn
+    }
+  }
+
+  /**
+   * Helper to ensure all completed cab bookings for a driver are registered as transactions
+   */
+  async syncDriverBookingsToTransactions(driverUserId: string): Promise<void> {
+    try {
+      const driver = await this.driverProfileRepo.findOne({
+        where: { userId: driverUserId },
+      });
+
+      const qb = this.cabBookingRepo.createQueryBuilder('b');
+      if (driver) {
+        qb.where('(b.driverProfileId = :dpId OR b.userId = :userId)', {
+          dpId: driver.id,
+          userId: driverUserId,
+        });
+      } else {
+        qb.where('b.userId = :userId', { userId: driverUserId });
+      }
+
+      const bookings = await qb
+        .andWhere('b.status = :status', { status: BookingStatus.COMPLETED })
+        .getMany();
+
+      for (const b of bookings) {
+        const total = Number(b.totalAmount) || 0;
+        if (total <= 0) continue;
+
+        const exists = await this.transactionRepo.findOne({
+          where: {
+            userId: driverUserId,
+            referenceId: b.id,
+          },
+        });
+
+        if (!exists) {
+          const isDriverOfRide = driver && b.driverProfileId === driver.id;
+          const driverPayout =
+            Number(b.remainingAmount) > 0
+              ? Number(b.remainingAmount)
+              : Math.round((Number(b.baseFare) || total * 0.8) * 0.8);
+          const txnAmount = isDriverOfRide ? (driverPayout > 0 ? driverPayout : total) : total;
+
+          await this.transactionRepo.save(
+            this.transactionRepo.create({
+              userId: driverUserId,
+              role: isDriverOfRide ? BusinessRole.DRIVER : BusinessRole.CUSTOMER,
+              type: isDriverOfRide ? TransactionType.CREDIT : TransactionType.DEBIT,
+              category: TransactionCategory.RIDE_FARE,
+              amount: txnAmount,
+              currency: 'INR',
+              status: TransactionStatus.COMPLETED,
+              referenceId: b.id,
+              referenceType: 'CAB_BOOKING',
+              title: isDriverOfRide
+                ? `Ride Completed • ${b.pickupLocation ? b.pickupLocation.substring(0, 24) : 'Cab Ride'}`
+                : `Cab Ride #${b.bookingNumber}`,
+              description: `Trip #${b.bookingNumber} (${b.passengerName}) to ${b.dropLocation}`,
+              paymentMethod: b.paymentMethod || 'CASH',
+              metadata: {
+                ticketId: b.bookingNumber,
+                bookingId: b.id,
+                vehicleNumber: b.cabPlateNumber || '',
+                vehicleType: b.cabCategory || 'Cab',
+                pickup: b.pickupLocation,
+                drop: b.dropLocation,
+                passengerName: b.passengerName,
+                passengerPhone: b.passengerPhone,
+                advanceAmount: b.advanceAmount,
+                remainingAmount: b.remainingAmount,
+                driverPayout,
+              },
+              createdAt: b.updatedAt || b.createdAt,
+            }),
+          );
+        }
+      }
+    } catch {
+      // Non-fatal sync error; log and proceed
+    }
+  }
+
+  /**
+   * Helper to ensure all completed technician bookings are registered as transactions
+   */
+  async syncTechnicianBookingsToTransactions(techUserId: string): Promise<void> {
+    try {
+      const tech = await this.techProfileRepo.findOne({
+        where: { userId: techUserId },
+      });
+
+      const qb = this.techBookingRepo.createQueryBuilder('b');
+      if (tech) {
+        qb.where('(b.technicianProfileId = :tpId OR b.userId = :userId)', {
+          tpId: tech.id,
+          userId: techUserId,
+        });
+      } else {
+        qb.where('b.userId = :userId', { userId: techUserId });
+      }
+
+      const bookings = await qb
+        .andWhere('b.status = :status', { status: TechnicianBookingStatus.COMPLETED })
+        .getMany();
+
+      for (const b of bookings) {
+        const total = Number(b.quotedAmount) || 0;
+        if (total <= 0) continue;
+
+        const exists = await this.transactionRepo.findOne({
+          where: {
+            userId: techUserId,
+            referenceId: b.id,
+          },
+        });
+
+        if (!exists) {
+          const isTechOfJob = tech && b.technicianProfileId === tech.id;
+          await this.transactionRepo.save(
+            this.transactionRepo.create({
+              userId: techUserId,
+              role: isTechOfJob ? BusinessRole.TECHNICIAN : BusinessRole.CUSTOMER,
+              type: isTechOfJob ? TransactionType.CREDIT : TransactionType.DEBIT,
+              category: TransactionCategory.TECH_FEE,
+              amount: total,
+              currency: 'INR',
+              status: TransactionStatus.COMPLETED,
+              referenceId: b.id,
+              referenceType: 'TECHNICIAN_BOOKING',
+              title: isTechOfJob
+                ? `Job Completed • ${b.issueDescription ? b.issueDescription.substring(0, 24) : 'Roadside Repair'}`
+                : `Roadside Assistance #${b.bookingNumber}`,
+              description: `Booking #${b.bookingNumber} (${b.vehicleMakeModel || b.vehiclePlateNumber || 'Vehicle'}) at ${b.breakdownLocation}`,
+              paymentMethod: 'CASH',
+              metadata: {
+                ticketId: b.bookingNumber,
+                bookingId: b.id,
+                vehicleNumber: b.vehiclePlateNumber,
+                vehicleType: b.vehicleType,
+                issueDescription: b.issueDescription,
+                breakdownLocation: b.breakdownLocation,
+                advanceAmount: b.advanceAmount,
+                remainingAmount: b.remainingAmount,
+              },
+              createdAt: b.updatedAt || b.createdAt,
+            }),
+          );
+        }
+      }
+    } catch {
+      // Non-fatal sync error; log and proceed
     }
   }
 }

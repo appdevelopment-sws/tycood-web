@@ -6,6 +6,10 @@ import { TransactionsController } from './transactions.controller';
 import { ParkingBooking } from '../parking/entities/parking-booking.entity';
 import { ParkingLocation } from '../parking/entities/parking-location.entity';
 import { ParkingOperator } from '../parking/entities/parking-operator.entity';
+import { Booking } from '../bookings/entities/booking.entity';
+import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { TechnicianBooking } from '../technicians/entities/technician-booking.entity';
+import { TechnicianProfile } from '../technicians/entities/technician-profile.entity';
 import { User } from '../users/entities/user.entity';
 
 @Module({
@@ -16,6 +20,10 @@ import { User } from '../users/entities/user.entity';
       ParkingBooking,
       ParkingLocation,
       ParkingOperator,
+      Booking,
+      DriverProfile,
+      TechnicianBooking,
+      TechnicianProfile,
     ]),
   ],
   controllers: [TransactionsController],

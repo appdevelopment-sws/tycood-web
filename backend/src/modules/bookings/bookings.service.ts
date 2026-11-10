@@ -16,6 +16,7 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity.js';
 import { Tax } from '../taxes/entities/tax.entity.js';
 import { TaxType } from '../taxes/enums/tax-type.enum.js';
 import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
+import { Transaction } from '../transactions/entities/transaction.entity.js';
 import { SystemSetting } from '../settings/entities/system-setting.entity.js';
 import { LocationService } from '../location/location.service.js';
 import { DispatchGateway } from '../dispatch/dispatch.gateway.js';
@@ -34,6 +35,10 @@ import {
   VerificationStatus,
   AvailabilityStatus,
   DriverVehicleAssignmentStatus,
+  BusinessRole,
+  TransactionType,
+  TransactionCategory,
+  TransactionStatus,
 } from '../../common/enums/index.js';
 
 @Injectable()
@@ -51,6 +56,8 @@ export class BookingsService {
     private readonly driverRepo: Repository<DriverProfile>,
     @InjectRepository(Tax)
     private readonly taxRepo: Repository<Tax>,
+    @InjectRepository(Transaction)
+    private readonly transactionRepo: Repository<Transaction>,
     private readonly dataSource: DataSource,
     @Optional()
     private readonly locationService?: LocationService,
@@ -1044,6 +1051,58 @@ export class BookingsService {
     if (dto.status === BookingStatus.COMPLETED) {
       booking.paymentStatus = PaymentStatus.COMPLETED;
       booking.remainingAmount = 0;
+
+      // Automatically register completion transaction for the driver
+      if (booking.driverProfileId) {
+        try {
+          const driver = await this.driverRepo.findOne({
+            where: { id: booking.driverProfileId },
+          });
+          if (driver?.userId) {
+            const existingTxn = await this.transactionRepo.findOne({
+              where: { userId: driver.userId, referenceId: booking.id },
+            });
+            if (!existingTxn) {
+              const driverAmount =
+                Number(booking.remainingAmount) > 0
+                  ? Number(booking.remainingAmount)
+                  : Math.round((Number(booking.baseFare) || Number(booking.totalAmount) * 0.8) * 0.8);
+
+              await this.transactionRepo.save(
+                this.transactionRepo.create({
+                  userId: driver.userId,
+                  role: BusinessRole.DRIVER,
+                  type: TransactionType.CREDIT,
+                  category: TransactionCategory.RIDE_FARE,
+                  amount: driverAmount > 0 ? driverAmount : Number(booking.totalAmount) || 0,
+                  currency: 'INR',
+                  status: TransactionStatus.COMPLETED,
+                  referenceId: booking.id,
+                  referenceType: 'CAB_BOOKING',
+                  title: `Ride Completed • ${booking.pickupLocation ? booking.pickupLocation.substring(0, 24) : 'Cab Ride'}`,
+                  description: `Trip #${booking.bookingNumber} (${booking.passengerName}) to ${booking.dropLocation}`,
+                  paymentMethod: booking.paymentMethod || 'CASH',
+                  metadata: {
+                    ticketId: booking.bookingNumber,
+                    bookingId: booking.id,
+                    vehicleNumber: booking.cabPlateNumber || '',
+                    vehicleType: booking.cabCategory || 'Cab',
+                    pickup: booking.pickupLocation,
+                    drop: booking.dropLocation,
+                    passengerName: booking.passengerName,
+                    passengerPhone: booking.passengerPhone,
+                    driverPayout: driverAmount,
+                    remainingAmount: booking.remainingAmount,
+                    advanceAmount: booking.advanceAmount,
+                  },
+                }),
+              );
+            }
+          }
+        } catch (e) {
+          this.logger.warn(`Could not create driver completion transaction: ${e}`);
+        }
+      }
     }
     const saved = await this.bookingRepo.save(booking);
 
