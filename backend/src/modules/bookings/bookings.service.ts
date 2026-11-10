@@ -132,18 +132,6 @@ export class BookingsService {
       ? Math.round(resolvedDistanceKm * 2 * 10) / 10
       : Math.round(resolvedDistanceKm * 10) / 10;
 
-    // Trip characteristics for conditional taxes and surcharges
-    const isAirportRide =
-      /airport|aerodrome|terminal|t1|t2|t3/i.test(query.pickupLocation || '') ||
-      /airport|aerodrome|terminal|t1|t2|t3/i.test(query.dropLocation || '') ||
-      (query as any).isAirportRide === true ||
-      (query as any).serviceType === 'AIRPORT';
-
-    const scheduledDate = query.startDate ? new Date(query.startDate) : new Date();
-    const scheduledHour = scheduledDate.getHours();
-    // Night ride window: 23:00 (11 PM) to 05:00 (5 AM)
-    const isNightRide = scheduledHour >= 23 || scheduledHour < 5;
-
     // 3. Fetch active taxes and surcharges from database
     let activeTaxes: Tax[] = [];
     try {
@@ -286,11 +274,9 @@ export class BookingsService {
       if (activeTaxes.length > 0) {
         for (const tax of activeTaxes) {
           const appliesToTrip =
+            tax.applicableOn === TaxScope.ALL_SERVICES ||
             tax.applicableOn === TaxScope.ALL_RIDES ||
-            (tax.applicableOn === TaxScope.OUTSTATION && isOutstation) ||
-            (tax.applicableOn === TaxScope.INTERCITY_ONLY && isOutstation) ||
-            (tax.applicableOn === TaxScope.AIRPORT_RIDES && isAirportRide) ||
-            (tax.applicableOn === TaxScope.NIGHT_RIDES && isNightRide);
+            (tax.applicableOn === TaxScope.OUTSTATION && isOutstation);
 
           if (appliesToTrip) {
             let taxAmt = 0;
@@ -310,19 +296,8 @@ export class BookingsService {
             });
           }
         }
-      } else {
-        // Fallback standard transport GST (5%)
-        const defaultGst = Math.round(subtotal * 0.05);
-        totalTaxAmount = defaultGst;
-        appliedTaxes.push({
-          name: 'Goods & Services Tax (GST 5%)',
-          code: 'GST_5',
-          rate: 5,
-          taxType: TaxType.PERCENTAGE,
-          applicableOn: TaxScope.ALL_RIDES,
-          amount: defaultGst,
-        });
       }
+      // Note: No hardcoded fallback tax. If no tax is configured or active for this trip in Admin Settings, tax remains 0.
 
       // Final Total Calculated Fare & MRP/Original Fare before discount
       const calculatedFare = Math.round(subtotal + totalTaxAmount);
@@ -404,8 +379,6 @@ export class BookingsService {
           tripType: query.tripType,
           isRoundTrip: isRoundTrip,
           isOutstation: isOutstation,
-          isAirportRide: isAirportRide,
-          isNightRide: isNightRide,
           oneWayKm: resolvedDistanceKm,
           totalBillableKm: totalBillableKm,
           baseFare: baseFare,

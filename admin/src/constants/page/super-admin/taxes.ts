@@ -25,14 +25,11 @@ export const TAX_TYPE_OPTIONS = [
 ]
 
 export const TAX_SCOPE_OPTIONS = [
-  { label: "All Services (Cabs, Technicians, Parking)", value: "ALL_SERVICES" },
+  { label: "All Services (Universal: Cabs, Technicians, Parking)", value: "ALL_SERVICES" },
   { label: "All Cab Rides", value: "ALL_RIDES" },
+  { label: "Outstation Cab Trips Only", value: "OUTSTATION" },
   { label: "Technicians & Roadside Assistance", value: "TECHNICIAN" },
   { label: "Smart Parking Bookings", value: "PARKING" },
-  { label: "Intercity City Cab Trips Only", value: "INTERCITY_ONLY" },
-  { label: "Airport Terminal Pickups & Drops", value: "AIRPORT_RIDES" },
-  { label: "Night Rides (11 PM - 5 AM)", value: "NIGHT_RIDES" },
-  { label: "Outstation Long-Distance Trips", value: "OUTSTATION" },
 ]
 
 export const TAX_FILTER_TYPE_OPTIONS = [
@@ -51,10 +48,7 @@ export const TAX_FILTER_SCOPE_OPTIONS = [
   { label: "All Scopes", value: "ALL" },
   { label: "All Services (Universal)", value: "ALL_SERVICES" },
   { label: "All Cab Rides", value: "ALL_RIDES" },
+  { label: "Outstation Only", value: "OUTSTATION" },
   { label: "Technicians & Roadside", value: "TECHNICIAN" },
-  { label: "Parking", value: "PARKING" },
-  { label: "Intercity Only", value: "INTERCITY_ONLY" },
-  { label: "Airport Rides", value: "AIRPORT_RIDES" },
-  { label: "Night Rides", value: "NIGHT_RIDES" },
-  { label: "Outstation", value: "OUTSTATION" },
+  { label: "Smart Parking", value: "PARKING" },
 ]

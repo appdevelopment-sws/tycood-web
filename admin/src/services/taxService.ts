@@ -56,32 +56,6 @@ const DEFAULT_PRESET_TAXES: Tax[] = [
     priority: 3,
     createdAt: new Date().toISOString(),
   },
-  {
-    id: "tax-default-airport",
-    name: "Airport Convenience & Terminal Cess",
-    code: "AIRPORT_CESS",
-    taxType: "FIXED",
-    rate: 60.0,
-    description: "Terminal facilitation charge for airport departures and pickups",
-    applicableOn: "AIRPORT_RIDES",
-    isIncludedInFare: false,
-    isActive: true,
-    priority: 4,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "tax-default-night",
-    name: "Night Peak & Safety Surcharge (10%)",
-    code: "NIGHT_SURCHARGE_10",
-    taxType: "PERCENTAGE",
-    rate: 10.0,
-    description: "Operational night surcharge applied from 11:00 PM to 05:00 AM",
-    applicableOn: "NIGHT_RIDES",
-    isIncludedInFare: false,
-    isActive: true,
-    priority: 5,
-    createdAt: new Date().toISOString(),
-  },
 ]
 
 function getLocalTaxes(): Tax[] {

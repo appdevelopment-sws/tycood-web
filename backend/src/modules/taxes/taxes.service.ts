@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,13 +15,29 @@ import { TaxType } from './enums/tax-type.enum.js';
 import { TaxScope } from './enums/tax-scope.enum.js';
 
 @Injectable()
-export class TaxesService {
+export class TaxesService implements OnModuleInit {
   private readonly logger = new Logger(TaxesService.name);
 
   constructor(
     @InjectRepository(Tax)
     private readonly taxRepo: Repository<Tax>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      // Remove unwanted legacy taxes (airport cess, night surcharge) from DB
+      await this.taxRepo
+        .createQueryBuilder()
+        .delete()
+        .where("code IN (:...codes) OR code ILIKE '%AIRPORT%'", {
+          codes: ['AIRPORT_CESS', 'NIGHT_SURCHARGE_10'],
+        })
+        .execute();
+      this.logger.log('Cleaned up legacy/unwanted tax rules from database.');
+    } catch {
+      // ignore during early bootstrapping
+    }
+  }
 
   async findAll(query?: QueryTaxesDto) {
     const qb = this.taxRepo.createQueryBuilder('tax');
@@ -176,6 +193,15 @@ export class TaxesService {
   }
 
   async seedPresets(): Promise<Tax[]> {
+    // Clean up unwanted legacy taxes
+    await this.taxRepo
+      .createQueryBuilder()
+      .delete()
+      .where("code IN (:...codes) OR code ILIKE '%AIRPORT%'", {
+        codes: ['AIRPORT_CESS', 'NIGHT_SURCHARGE_10'],
+      })
+      .execute();
+
     const presets: Partial<Tax>[] = [
       {
         name: 'Platform Convenience Fee',
@@ -185,7 +211,7 @@ export class TaxesService {
         description: 'Standard aggregated platform access, emergency dispatch and technology convenience fee',
         applicableOn: TaxScope.ALL_SERVICES,
         isIncludedInFare: false,
-        isActive: true,
+        isActive: false,
         priority: 0,
       },
       {
@@ -222,28 +248,6 @@ export class TaxesService {
         priority: 3,
       },
       {
-        name: 'Airport Convenience & Access Cess',
-        code: 'AIRPORT_CESS',
-        taxType: TaxType.FIXED,
-        rate: 60.0,
-        description: 'Fixed terminal toll charge for rides originating or ending at airport terminals',
-        applicableOn: TaxScope.AIRPORT_RIDES,
-        isIncludedInFare: false,
-        isActive: true,
-        priority: 4,
-      },
-      {
-        name: 'Night Ride Safety Surcharge (10%)',
-        code: 'NIGHT_SURCHARGE_10',
-        taxType: TaxType.PERCENTAGE,
-        rate: 10.0,
-        description: 'Operational peak & security surcharge applied to trips booked between 11:00 PM and 05:00 AM',
-        applicableOn: TaxScope.NIGHT_RIDES,
-        isIncludedInFare: false,
-        isActive: true,
-        priority: 5,
-      },
-      {
         name: 'Interstate State Border Road Tax',
         code: 'STATE_BORDER_TAX',
         taxType: TaxType.FIXED,
@@ -252,7 +256,7 @@ export class TaxesService {
         applicableOn: TaxScope.OUTSTATION,
         isIncludedInFare: false,
         isActive: false,
-        priority: 6,
+        priority: 4,
       },
     ];
 

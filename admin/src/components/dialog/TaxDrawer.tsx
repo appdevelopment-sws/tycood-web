@@ -158,7 +158,7 @@ export default function TaxDrawer({ open, onClose, tax }: TaxDrawerProps) {
               control={control}
               name="code"
               label="Tax Identifier Code"
-              placeholder="e.g. GST_5 or AIRPORT_CESS"
+              placeholder="e.g. GST_5 or CGST_2_5"
               required
               readOnly={isViewMode}
             />
@@ -228,7 +228,7 @@ export default function TaxDrawer({ open, onClose, tax }: TaxDrawerProps) {
             <FormSelectField
               control={control}
               name="applicableOn"
-              label="Ride Application Scope"
+              label="Application Service Scope"
               options={TAX_SCOPE_OPTIONS}
               required
               readOnly={isViewMode}

@@ -777,6 +777,19 @@ export class InitialSeedService implements OnApplicationBootstrap {
   }
 
   private async seedTaxesAndSettings() {
+    // Clean up unwanted legacy taxes (airport cess, night surcharge)
+    try {
+      await this.taxRepo
+        .createQueryBuilder()
+        .delete()
+        .where("code IN (:...codes) OR code ILIKE '%AIRPORT%'", {
+          codes: ['AIRPORT_CESS', 'NIGHT_SURCHARGE_10'],
+        })
+        .execute();
+    } catch {
+      // ignore
+    }
+
     // Seed initial taxes if empty
     const taxCount = await this.taxRepo.count();
     if (taxCount === 0) {
@@ -815,36 +828,12 @@ export class InitialSeedService implements OnApplicationBootstrap {
           isActive: false,
           priority: 3,
         },
-        {
-          name: 'Airport Convenience & Access Cess',
-          code: 'AIRPORT_CESS',
-          taxType: TaxType.FIXED,
-          rate: 60.0,
-          description:
-            'Fixed terminal toll charge for rides originating or ending at airport terminals',
-          applicableOn: TaxScope.AIRPORT_RIDES,
-          isIncludedInFare: false,
-          isActive: true,
-          priority: 4,
-        },
-        {
-          name: 'Night Ride Safety Surcharge (10%)',
-          code: 'NIGHT_SURCHARGE_10',
-          taxType: TaxType.PERCENTAGE,
-          rate: 10.0,
-          description:
-            'Operational peak & security surcharge applied to trips booked between 11:00 PM and 05:00 AM',
-          applicableOn: TaxScope.NIGHT_RIDES,
-          isIncludedInFare: false,
-          isActive: true,
-          priority: 5,
-        },
       ];
 
       for (const t of defaultTaxes) {
         await this.taxRepo.save(this.taxRepo.create(t));
       }
-      this.logger.log('Seeded default industry taxes and surcharges.');
+      this.logger.log('Seeded default statutory taxes.');
     }
 
     // Seed default system settings if empty
