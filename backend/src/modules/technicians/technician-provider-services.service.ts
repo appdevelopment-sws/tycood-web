@@ -12,6 +12,7 @@ import { TechnicianProviderService } from './entities/technician-provider-servic
 import { ConfigureProviderServicesDto } from './dto/configure-provider-services.dto.js';
 import { AvailabilityStatus } from '../../common/enums/availability-status.enum.js';
 import { VerificationStatus } from '../../common/enums/verification-status.enum.js';
+import { TechnicianBookingStatus } from '../../common/enums/technician-status.enum.js';
 
 @Injectable()
 export class TechnicianProviderServicesService {
@@ -119,6 +120,29 @@ export class TechnicianProviderServicesService {
 
     const providers = await qb.getMany();
 
+    // Query average ratings dynamically from reviews table
+    const targetIds = providers
+      .flatMap((ps) => [ps.technicianProfile?.id, ps.technicianProfile?.userId])
+      .filter((id): id is string => Boolean(id));
+
+    const ratingsMap: Record<string, number> = {};
+    if (targetIds.length > 0) {
+      try {
+        const reviewRows = await this.dataSource.query(
+          `SELECT target_id, ROUND(AVG(rating)::numeric, 1) as avg_rating 
+           FROM reviews 
+           WHERE target_id = ANY($1) 
+           GROUP BY target_id`,
+          [targetIds],
+        );
+        for (const row of reviewRows) {
+          ratingsMap[row.target_id] = parseFloat(row.avg_rating) || 5.0;
+        }
+      } catch {
+        // Fallback safely if reviews table query fails
+      }
+    }
+
     // Map and calculate approximate distance if coordinates are provided
     return providers.map((ps) => {
       let distanceKm: number | null = null;
@@ -131,6 +155,12 @@ export class TechnicianProviderServicesService {
         );
       }
 
+      const tech = ps.technicianProfile;
+      const dynamicRating =
+        ratingsMap[tech.id] ||
+        ratingsMap[tech.userId] ||
+        (tech.user?.passengerRating ? Number(tech.user.passengerRating) : 5.0);
+
       return {
         providerServiceId: ps.id,
         technicianProfileId: ps.technicianProfile.id,
@@ -138,7 +168,7 @@ export class TechnicianProviderServicesService {
         workshopName: ps.technicianProfile.workshopName,
         experienceYears: ps.technicianProfile.experienceYears,
         vehicleType: ps.technicianProfile.vehicleType,
-        rating: 4.9, // Dynamic rating calculation or snapshot
+        rating: dynamicRating,
         customPrice: ps.customPrice,
         notes: ps.notes,
         distanceKm: distanceKm ? Number(distanceKm.toFixed(1)) : null,
@@ -160,10 +190,34 @@ export class TechnicianProviderServicesService {
       relations: {
         user: true,
         providerServices: true,
+        bookings: true,
       },
     });
 
     const categoryBasePrice = category ? category.basePrice : 450;
+
+    // Query average ratings dynamically from reviews table
+    const targetIds = techProfiles
+      .flatMap((t) => [t.id, t.userId])
+      .filter((id): id is string => Boolean(id));
+
+    const ratingsMap: Record<string, number> = {};
+    if (targetIds.length > 0) {
+      try {
+        const reviewRows = await this.dataSource.query(
+          `SELECT target_id, ROUND(AVG(rating)::numeric, 1) as avg_rating 
+           FROM reviews 
+           WHERE target_id = ANY($1) 
+           GROUP BY target_id`,
+          [targetIds],
+        );
+        for (const row of reviewRows) {
+          ratingsMap[row.target_id] = parseFloat(row.avg_rating) || 5.0;
+        }
+      } catch {
+        // Fallback safely if reviews table query fails
+      }
+    }
 
     const list = techProfiles.map((tech) => {
       let distanceKm: number | null = null;
@@ -174,6 +228,14 @@ export class TechnicianProviderServicesService {
       const customSvc = tech.providerServices?.find((ps) => ps.categoryId === categoryId);
       const price = customSvc && customSvc.customPrice > 0 ? customSvc.customPrice : categoryBasePrice;
       const isOnline = tech.availabilityStatus === AvailabilityStatus.AVAILABLE;
+      const completedJobs =
+        tech.bookings?.filter(
+          (b) => b.status === TechnicianBookingStatus.COMPLETED,
+        ).length || 0;
+      const dynamicRating =
+        ratingsMap[tech.id] ||
+        ratingsMap[tech.userId] ||
+        (tech.user?.passengerRating ? Number(tech.user.passengerRating) : 5.0);
 
       return {
         technicianProfileId: tech.id,
@@ -181,7 +243,9 @@ export class TechnicianProviderServicesService {
         workshopName: tech.workshopName || (tech.user?.name ? `${tech.user.name}'s Workshop` : 'Authorized Auto Center'),
         experienceYears: tech.experienceYears || '3-5 years',
         vehicleType: tech.vehicleType || 'Rapid Response Van',
-        rating: 4.9,
+        rating: dynamicRating,
+        completedJobsCount: completedJobs,
+        phone: tech.user?.phone || null,
         price: Number(price),
         isOnline,
         availabilityStatus: tech.availabilityStatus,
