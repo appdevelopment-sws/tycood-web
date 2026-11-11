@@ -433,9 +433,9 @@ export class TechnicianBookingsService {
     const allowedTransitions: Record<TechnicianBookingStatus, TechnicianBookingStatus[]> = {
       [TechnicianBookingStatus.SEARCHING]: [TechnicianBookingStatus.ACCEPTED, TechnicianBookingStatus.CANCELLED],
       [TechnicianBookingStatus.REQUESTED]: [TechnicianBookingStatus.ACCEPTED, TechnicianBookingStatus.CANCELLED],
-      [TechnicianBookingStatus.ACCEPTED]: [TechnicianBookingStatus.QUOTATION_SUBMITTED, TechnicianBookingStatus.EN_ROUTE, TechnicianBookingStatus.CANCELLED],
+      [TechnicianBookingStatus.ACCEPTED]: [TechnicianBookingStatus.QUOTATION_SUBMITTED, TechnicianBookingStatus.EN_ROUTE, TechnicianBookingStatus.ARRIVED, TechnicianBookingStatus.CANCELLED],
       [TechnicianBookingStatus.QUOTATION_SUBMITTED]: [TechnicianBookingStatus.CONFIRMED, TechnicianBookingStatus.CANCELLED],
-      [TechnicianBookingStatus.CONFIRMED]: [TechnicianBookingStatus.EN_ROUTE, TechnicianBookingStatus.CANCELLED],
+      [TechnicianBookingStatus.CONFIRMED]: [TechnicianBookingStatus.EN_ROUTE, TechnicianBookingStatus.ARRIVED, TechnicianBookingStatus.CANCELLED],
       [TechnicianBookingStatus.EN_ROUTE]: [TechnicianBookingStatus.ARRIVED, TechnicianBookingStatus.CANCELLED],
       [TechnicianBookingStatus.ARRIVED]: [TechnicianBookingStatus.IN_PROGRESS, TechnicianBookingStatus.CANCELLED],
       [TechnicianBookingStatus.IN_PROGRESS]: [TechnicianBookingStatus.COMPLETED, TechnicianBookingStatus.CANCELLED],
@@ -482,7 +482,11 @@ export class TechnicianBookingsService {
     }
 
     booking.status = TechnicianBookingStatus.IN_PROGRESS;
-    return this.bookingRepo.save(booking);
+    const saved = await this.bookingRepo.save(booking);
+    if (this.dispatchGateway) {
+      this.dispatchGateway.broadcastBookingStatusUpdated(bookingId, TechnicianBookingStatus.IN_PROGRESS);
+    }
+    return saved;
   }
 
   // ==================== 7. COMPLETE JOB & COLLECT REMAINING BALANCE ====================
@@ -511,7 +515,11 @@ export class TechnicianBookingsService {
     booking.status = TechnicianBookingStatus.COMPLETED;
     booking.remainingPaymentStatus = PaymentStatus.COMPLETED; // Collected directly by provider
     booking.completedAt = new Date();
-    return this.bookingRepo.save(booking);
+    const saved = await this.bookingRepo.save(booking);
+    if (this.dispatchGateway) {
+      this.dispatchGateway.broadcastBookingStatusUpdated(bookingId, TechnicianBookingStatus.COMPLETED);
+    }
+    return saved;
   }
 
   // ==================== 8. CANCEL BOOKING ====================

@@ -274,12 +274,19 @@ export class DispatchGateway
 
     // 1. If targeted to a specific technician profile:
     if (booking.technicianProfileId) {
+      const directPayload = {
+        ...payload,
+        isDirectAssignment: true,
+        technicianProfileId: booking.technicianProfileId,
+        status: booking.status,
+      };
+
       try {
         const techProfile = await this.dispatchService.getTechnicianProfile(
           booking.technicianProfileId,
         );
         if (techProfile?.userId) {
-          this.server.to(`user_${techProfile.userId}`).emit('new_booking_request', payload);
+          this.server.to(`user_${techProfile.userId}`).emit('new_booking_request', directPayload);
         }
       } catch (_) {}
 
@@ -291,10 +298,11 @@ export class DispatchGateway
           `Targeting technician booking ${booking.bookingNumber} directly to technician profile ${booking.technicianProfileId} (${targetSockets.length} sockets)`,
         );
         for (const sockId of targetSockets) {
-          this.server.to(sockId).emit('new_booking_request', payload);
+          this.server.to(sockId).emit('new_booking_request', directPayload);
         }
-        return;
       }
+      // Direct booking already assigned to specific technician; do not broadcast to general unaccepted pool
+      return;
     }
 
     // 2. Broadcast to technicians room

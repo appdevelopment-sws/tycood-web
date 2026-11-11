@@ -893,9 +893,9 @@ export class BookingsService {
             statuses: [
               TechnicianBookingStatus.REQUESTED,
               TechnicianBookingStatus.SEARCHING,
-              TechnicianBookingStatus.CONFIRMED,
             ],
-          });
+          })
+          .andWhere('tb.technicianProfileId IS NULL');
 
         if (query.search && query.search.trim().length > 0) {
           const searchTerm = `%${query.search.trim().toLowerCase()}%`;
@@ -923,8 +923,13 @@ export class BookingsService {
             }
           }
 
-          const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 450);
-          const payout = Number(tb.remainingAmount || totalAmount);
+          const advanceAmount = Number(tb.advanceAmount || 0);
+          const remainingAmount = Number(tb.remainingAmount || 0);
+          const totalAmount =
+            advanceAmount + remainingAmount > 0
+              ? advanceAmount + remainingAmount
+              : Number(tb.quotedAmount || 0) + Number(tb.taxAmount || 0) || 450;
+          const payout = remainingAmount > 0 ? remainingAmount : Math.round(totalAmount * 0.8);
 
           results.push({
             id: tb.id,
@@ -1130,11 +1135,15 @@ export class BookingsService {
 
         const techBookings = await tqb.getMany();
         techData = techBookings.map((tb) => {
-          const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 0);
           const advanceAmount = Number(tb.advanceAmount || 0);
-          const remainingAmount = Number(tb.remainingAmount || (totalAmount - advanceAmount));
+          const remainingAmount = Number(tb.remainingAmount || 0);
+          const totalAmount =
+            advanceAmount + remainingAmount > 0
+              ? advanceAmount + remainingAmount
+              : Number(tb.quotedAmount || 0) + Number(tb.taxAmount || 0);
           const taxAmount = Number(tb.taxAmount || 0);
-          const baseFare = Math.max(0, totalAmount - taxAmount - 20);
+          const baseFare = Number(tb.quotedAmount || Math.max(0, totalAmount - taxAmount));
+          const payout = remainingAmount > 0 ? remainingAmount : Math.round(totalAmount * 0.8);
           const techUser = tb.technicianProfile?.user;
           const techName = tb.technicianProfile?.workshopName || techUser?.name || 'Verified Mechanic';
           const techPhone = techUser?.phone || '';
@@ -1153,6 +1162,8 @@ export class BookingsService {
             baseFare,
             advanceAmount,
             remainingAmount,
+            driverPayout: payout,
+            payout,
             platformFee: 20,
             taxAmount,
             adminCommissionRate: Number(tb.adminCommissionPercentage || 20),
@@ -1179,6 +1190,7 @@ export class BookingsService {
             otp: tb.startOtp,
             startOtp: tb.startOtp,
             securityOtp: tb.startOtp,
+            completionOtp: tb.completionOtp,
             technicianName: techName,
             driverName: techName,
             technicianPhone: techPhone,
@@ -1284,11 +1296,15 @@ export class BookingsService {
 
       const tb = await tqb.getOne();
       if (tb) {
-        const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 0);
         const advanceAmount = Number(tb.advanceAmount || 0);
-        const remainingAmount = Number(tb.remainingAmount || (totalAmount - advanceAmount));
+        const remainingAmount = Number(tb.remainingAmount || 0);
+        const totalAmount =
+          advanceAmount + remainingAmount > 0
+            ? advanceAmount + remainingAmount
+            : Number(tb.quotedAmount || 0) + Number(tb.taxAmount || 0);
         const taxAmount = Number(tb.taxAmount || 0);
-        const baseFare = Math.max(0, totalAmount - taxAmount - 20);
+        const baseFare = Number(tb.quotedAmount || Math.max(0, totalAmount - taxAmount));
+        const payout = remainingAmount > 0 ? remainingAmount : Math.round(totalAmount * 0.8);
         const techUser = tb.technicianProfile?.user;
         const techName = tb.technicianProfile?.workshopName || techUser?.name || 'Verified Mechanic';
         const techPhone = techUser?.phone || '';
@@ -1306,6 +1322,8 @@ export class BookingsService {
           baseFare,
           advanceAmount,
           remainingAmount,
+          driverPayout: payout,
+          payout,
           platformFee: 20,
           taxAmount,
           adminCommissionRate: Number(tb.adminCommissionPercentage || 20),
@@ -1330,6 +1348,7 @@ export class BookingsService {
           otp: tb.startOtp,
           startOtp: tb.startOtp,
           securityOtp: tb.startOtp,
+          completionOtp: tb.completionOtp,
           technicianName: techName,
           driverName: techName,
           technicianPhone: techPhone,
