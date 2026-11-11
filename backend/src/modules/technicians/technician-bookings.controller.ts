@@ -53,14 +53,13 @@ export class TechnicianBookingsController {
   }
 
   @Get('my-bookings')
-  @ApiOperation({ summary: 'Get current customer bookings history' })
-  @ApiResponse({ status: 200, description: 'Customer bookings' })
+  @ApiOperation({ summary: 'Get current customer or technician bookings history' })
+  @ApiResponse({ status: 200, description: 'Customer or technician bookings' })
   async getMyBookings(
     @CurrentUser() user: CurrentUserDto,
     @Query() query: QueryTechnicianBookingsDto,
   ) {
-    query.userId = user.userId;
-    return this.bookingsService.findAll(query);
+    return this.bookingsService.findMyBookings(user.userId, query);
   }
 
   @Get(':id')

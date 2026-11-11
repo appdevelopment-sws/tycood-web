@@ -12,6 +12,7 @@ import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { DispatchService } from './dispatch.service.js';
 import { Booking } from '../bookings/entities/booking.entity.js';
+import { TechnicianBooking } from '../technicians/entities/technician-booking.entity.js';
 
 @WebSocketGateway({
   cors: {
@@ -218,6 +219,116 @@ export class DispatchGateway
       // NEVER broadcast to offline clients or open broadcast rooms
       this.logger.warn(
         `No online ${categoryUpper} providers available within 20km radius for booking ${booking.bookingNumber}. Offline providers will not be notified.`,
+      );
+    }
+  }
+
+  /**
+   * Broadcast a new roadside technician booking request to eligible technicians within radius
+   */
+  async broadcastNewTechnicianBooking(
+    booking: TechnicianBooking,
+    pickupLat?: number | null,
+    pickupLng?: number | null,
+  ) {
+    const lat = pickupLat ?? (booking.breakdownLat ? Number(booking.breakdownLat) : null);
+    const lng = pickupLng ?? (booking.breakdownLng ? Number(booking.breakdownLng) : null);
+    const totalAmount = Number(booking.quotedAmount || booking.advanceAmount || 450);
+    const payout = Number(booking.remainingAmount || totalAmount);
+
+    const payload = {
+      bookingId: booking.id,
+      id: booking.id,
+      bookingNumber: booking.bookingNumber,
+      serviceType: 'TECHNICIAN',
+      cabCategory: 'Roadside Mechanic',
+      cabName: booking.category?.name || 'Roadside Assistance',
+      issue: booking.issueDescription || booking.category?.name || 'Breakdown Assistance',
+      vehicle: `${booking.vehicleType || 'Vehicle'}${booking.vehicleMakeModel ? ` • ${booking.vehicleMakeModel}` : ''}${booking.vehiclePlateNumber ? ` (${booking.vehiclePlateNumber})` : ''}`,
+      location: booking.breakdownLocation,
+      pickupLocation: booking.breakdownLocation,
+      dropLocation: booking.landmark || 'Breakdown Location',
+      landmark: booking.landmark,
+      customerLat: lat,
+      customerLng: lng,
+      pickupLat: lat,
+      pickupLng: lng,
+      fare: totalAmount,
+      totalAmount: totalAmount,
+      driverPayout: payout,
+      payout: payout,
+      baseFare: totalAmount,
+      advanceAmount: Number(booking.advanceAmount ?? 0),
+      remainingAmount: Number(booking.remainingAmount ?? 0),
+      platformFee: Number(booking.taxAmount ?? 0),
+      taxAmount: Number(booking.taxAmount ?? 0),
+      adminCommissionRate: 20,
+      paymentStatus: booking.advancePaymentStatus,
+      paymentMethod: booking.advancePaymentMethod,
+      passengerName: booking.user?.name || 'Customer',
+      passengerPhone: booking.user?.phone || '',
+      otp: booking.startOtp,
+      expiresInSeconds: 45,
+      createdAt: booking.createdAt,
+    };
+
+    // 1. If targeted to a specific technician profile:
+    if (booking.technicianProfileId) {
+      try {
+        const techProfile = await this.dispatchService.getTechnicianProfile(
+          booking.technicianProfileId,
+        );
+        if (techProfile?.userId) {
+          this.server.to(`user_${techProfile.userId}`).emit('new_booking_request', payload);
+        }
+      } catch (_) {}
+
+      const targetSockets = await this.dispatchService.findSocketsForTechnicianProfile(
+        booking.technicianProfileId,
+      );
+      if (targetSockets.length > 0) {
+        this.logger.log(
+          `Targeting technician booking ${booking.bookingNumber} directly to technician profile ${booking.technicianProfileId} (${targetSockets.length} sockets)`,
+        );
+        for (const sockId of targetSockets) {
+          this.server.to(sockId).emit('new_booking_request', payload);
+        }
+        return;
+      }
+    }
+
+    // 2. Broadcast to technicians room
+    this.server.to('technicians').emit('new_booking_request', payload);
+
+    // 3. Broadcast to eligible online technicians within radius
+    const targetSocketIds = await this.dispatchService.findEligibleProvidersWithinRadius(
+      'TECHNICIAN',
+      lat,
+      lng,
+      25,
+    );
+
+    if (targetSocketIds.length > 0) {
+      this.logger.log(
+        `Dispatching technician booking ${booking.bookingNumber} to ${targetSocketIds.length} candidate online technicians within 25km`,
+      );
+      for (const socketId of targetSocketIds) {
+        this.server.to(socketId).emit('new_booking_request', payload);
+      }
+    }
+
+    // 4. Fallback: Broadcast to all online connected technicians
+    const allOnlineTechSockets = this.dispatchService.getAllConnectedTechnicianSockets();
+    if (allOnlineTechSockets.length > 0) {
+      this.logger.log(
+        `Dispatching technician booking ${booking.bookingNumber} to ${allOnlineTechSockets.length} online technician sockets`,
+      );
+      for (const socketId of allOnlineTechSockets) {
+        this.server.to(socketId).emit('new_booking_request', payload);
+      }
+    } else {
+      this.logger.warn(
+        `No online technicians available for booking ${booking.bookingNumber}`,
       );
     }
   }

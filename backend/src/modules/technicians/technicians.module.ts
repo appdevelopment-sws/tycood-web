@@ -7,6 +7,7 @@ import { TechnicianProviderService } from './entities/technician-provider-servic
 import { TechnicianBooking } from './entities/technician-booking.entity.js';
 import { SystemSetting } from '../settings/entities/system-setting.entity.js';
 import { Tax } from '../taxes/entities/tax.entity.js';
+import { DispatchModule } from '../dispatch/dispatch.module.js';
 
 import { TechniciansService } from './technicians.service.js';
 import { TechnicianCategoriesService } from './technician-categories.service.js';
@@ -28,6 +29,7 @@ import { TechnicianBookingsController } from './technician-bookings.controller.j
       SystemSetting,
       Tax,
     ]),
+    DispatchModule,
   ],
   controllers: [
     TechniciansController,

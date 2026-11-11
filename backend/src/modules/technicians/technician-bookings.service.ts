@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -27,6 +28,7 @@ import {
 import { Tax } from '../taxes/entities/tax.entity.js';
 import { TaxScope } from '../taxes/enums/tax-scope.enum.js';
 import { TaxType } from '../taxes/enums/tax-type.enum.js';
+import { DispatchGateway } from '../dispatch/dispatch.gateway.js';
 
 @Injectable()
 export class TechnicianBookingsService {
@@ -46,6 +48,8 @@ export class TechnicianBookingsService {
     @InjectRepository(SystemSetting)
     private readonly settingRepo: Repository<SystemSetting>,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly dispatchGateway?: DispatchGateway,
   ) {}
 
   private generateBookingNumber(): string {
@@ -80,7 +84,7 @@ export class TechnicianBookingsService {
     const completionOtp = this.generateOtp();
     const adminCommissionPercentage = await this.getCommissionPercentage();
 
-    return this.dataSource.transaction(async (manager) => {
+    const savedBooking = await this.dataSource.transaction(async (manager) => {
       let quotedAmount = 0.0;
       let taxAmount = 0.0;
       let advanceAmount = 0.0;
@@ -228,6 +232,26 @@ export class TechnicianBookingsService {
 
       return manager.save(booking);
     });
+
+    // Real-time WebSocket dispatch to online technicians within radius
+    try {
+      const fullBooking = await this.findById(savedBooking.id);
+      if (this.dispatchGateway) {
+        this.dispatchGateway
+          .broadcastNewTechnicianBooking(
+            fullBooking,
+            dto.breakdownLat ? Number(dto.breakdownLat) : null,
+            dto.breakdownLng ? Number(dto.breakdownLng) : null,
+          )
+          .catch((err) =>
+            this.logger.warn(`Failed to broadcast new technician booking: ${err}`),
+          );
+      }
+    } catch (err: any) {
+      this.logger.warn(`Error broadcasting technician booking: ${err?.message}`);
+    }
+
+    return savedBooking;
   }
 
   // ==================== 2. PROVIDER ACCEPTS REQUEST ====================
@@ -261,7 +285,22 @@ export class TechnicianBookingsService {
 
     booking.technicianProfileId = profile.id;
     booking.status = TechnicianBookingStatus.ACCEPTED;
-    return this.bookingRepo.save(booking);
+    const updated = await this.bookingRepo.save(booking);
+
+    if (this.dispatchGateway) {
+      this.dispatchGateway.broadcastBookingAccepted(
+        bookingId,
+        {
+          driverId: profile.id,
+          driverName: profile.workshopName || profile.user?.name || 'Verified Mechanic',
+          driverPhone: profile.user?.phone,
+          cabName: profile.vehicleType || 'Mechanic Unit',
+        },
+        'TECHNICIAN',
+      );
+    }
+
+    return updated;
   }
 
   // ==================== 3. PROVIDER SUBMITS QUOTATION (FLOW B) ====================
@@ -411,7 +450,12 @@ export class TechnicianBookingsService {
     }
 
     booking.status = newStatus;
-    return this.bookingRepo.save(booking);
+    const updated = await this.bookingRepo.save(booking);
+
+    if (this.dispatchGateway) {
+      this.dispatchGateway.broadcastBookingStatusUpdated(bookingId, newStatus);
+    }
+    return updated;
   }
 
   // ==================== 6. START OTP VERIFICATION ====================
@@ -497,6 +541,59 @@ export class TechnicianBookingsService {
   }
 
   // ==================== 9. LIST & QUERY BOOKINGS ====================
+
+  async findMyBookings(
+    userId: string,
+    query: QueryTechnicianBookingsDto,
+  ): Promise<PaginatedResult<TechnicianBooking>> {
+    const techProfile = await this.techProfileRepo.findOne({ where: { userId } });
+    const qb = this.bookingRepo
+      .createQueryBuilder('b')
+      .leftJoinAndSelect('b.user', 'user')
+      .leftJoinAndSelect('b.technicianProfile', 'tech')
+      .leftJoinAndSelect('tech.user', 'techUser')
+      .leftJoinAndSelect('b.category', 'cat')
+      .leftJoinAndSelect('b.serviceCatalogItem', 'srv');
+
+    if (techProfile) {
+      qb.where('(b.technicianProfileId = :techId OR b.userId = :userId)', {
+        techId: techProfile.id,
+        userId,
+      });
+    } else {
+      qb.where('b.userId = :userId', { userId });
+    }
+
+    if (query.status) {
+      qb.andWhere('b.status = :status', { status: query.status });
+    }
+
+    if (query.bookingType) {
+      qb.andWhere('b.bookingType = :bookingType', { bookingType: query.bookingType });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(b.bookingNumber) LIKE LOWER(:search) OR LOWER(b.breakdownLocation) LIKE LOWER(:search) OR LOWER(b.vehiclePlateNumber) LIKE LOWER(:search) OR LOWER(user.name) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('b.createdAt', query.sortOrder || 'DESC');
+    qb.skip(query.skip).take(query.limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page: query.page || 1,
+        limit: query.limit || 10,
+        totalPages: Math.ceil(total / (query.limit || 10)),
+      },
+    };
+  }
 
   async findAll(query: QueryTechnicianBookingsDto): Promise<PaginatedResult<TechnicianBooking>> {
     const qb = this.bookingRepo

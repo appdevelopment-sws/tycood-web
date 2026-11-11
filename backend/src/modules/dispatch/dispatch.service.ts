@@ -250,10 +250,12 @@ export class DispatchService {
       if (!client.isOnline) continue;
 
       // Category matching: CAB matches CAB/DRIVER, TECHNICIAN matches TECHNICIAN
+      const clientRoleUpper = (client.role || '').toUpperCase();
+      const clientCatUpper = (client.serviceCategory || '').toUpperCase();
       const matchesCategory =
-        client.serviceCategory === categoryUpper ||
-        (categoryUpper === 'CAB' && client.role === 'DRIVER') ||
-        (categoryUpper === 'TECHNICIAN' && client.role === 'TECHNICIAN');
+        clientCatUpper === categoryUpper ||
+        (categoryUpper === 'CAB' && clientRoleUpper === 'DRIVER') ||
+        (categoryUpper === 'TECHNICIAN' && clientRoleUpper === 'TECHNICIAN');
 
       if (!matchesCategory) continue;
 
@@ -308,5 +310,55 @@ export class DispatchService {
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return Math.round(R * c * 10) / 10;
+  }
+
+  /**
+   * Find candidate socket IDs for a specific technician profile ID
+   */
+  async getTechnicianProfile(profileId: string): Promise<TechnicianProfile | null> {
+    try {
+      return await this.technicianProfileRepo.findOne({
+        where: { id: profileId },
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async findSocketsForTechnicianProfile(profileId: string): Promise<string[]> {
+    try {
+      const tech = await this.technicianProfileRepo.findOne({
+        where: { id: profileId },
+      });
+      if (!tech?.userId) return [];
+
+      const socketIds: string[] = [];
+      for (const client of this.connectedClients.values()) {
+        if (client.userId === tech.userId) {
+          socketIds.push(client.socketId);
+        }
+      }
+      return socketIds;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get all online connected technician sockets
+   */
+  getAllConnectedTechnicianSockets(): string[] {
+    const socketIds: string[] = [];
+    for (const client of this.connectedClients.values()) {
+      const clientRoleUpper = (client.role || '').toUpperCase();
+      const clientCatUpper = (client.serviceCategory || '').toUpperCase();
+      if (
+        client.isOnline &&
+        (clientRoleUpper === 'TECHNICIAN' || clientCatUpper === 'TECHNICIAN')
+      ) {
+        socketIds.push(client.socketId);
+      }
+    }
+    return socketIds;
   }
 }

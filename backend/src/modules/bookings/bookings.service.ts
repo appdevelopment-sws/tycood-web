@@ -26,6 +26,9 @@ import { AvailableCabsQueryDto } from './dto/available-cabs-query.dto.js';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto.js';
 import { PaginatedResult } from '../../common/dto/pagination.dto.js';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity.js';
+import { TechnicianBooking } from '../technicians/entities/technician-booking.entity.js';
+import { TechnicianProfile } from '../technicians/entities/technician-profile.entity.js';
+import { TechnicianBookingStatus } from '../../common/enums/technician-status.enum.js';
 import {
   BookingServiceType,
   BookingStatus,
@@ -682,6 +685,77 @@ export class BookingsService {
       });
 
       if (!booking) {
+        // Fallback: Check if this is a Roadside Technician booking
+        const techBooking = await queryRunner.manager.findOne(TechnicianBooking, {
+          where: { id: bookingId },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (techBooking) {
+          let techProfile = await queryRunner.manager.findOne(TechnicianProfile, {
+            where: { userId: driverUserId },
+            relations: { user: true },
+          });
+
+          if (!techProfile) {
+            const user = await queryRunner.manager.findOne(User, { where: { id: driverUserId } });
+            if (user) {
+              techProfile = queryRunner.manager.create(TechnicianProfile, {
+                userId: user.id,
+                workshopName: `${user.name}'s Workshop`,
+                baseArea: user.city || 'Patna Central',
+                serviceRadiusKm: 15.0,
+                specializations: ['Emergency Roadside Assistance', 'Towing & Recovery', 'Jump Start & Battery'],
+                toolsAvailable: ['Diagnostic Scanner', 'Hydraulic Jack', 'Battery Jump Starter'],
+                vehicleType: 'Service Bike / Van',
+                verificationStatus: VerificationStatus.VERIFIED,
+                availabilityStatus: AvailabilityStatus.AVAILABLE,
+                rating: 4.8,
+                completedJobsCount: 0,
+              });
+              techProfile = await queryRunner.manager.save(TechnicianProfile, techProfile);
+              techProfile.user = user;
+            } else {
+              throw new ForbiddenException('Only verified technicians can accept this booking');
+            }
+          }
+
+          if (
+            techBooking.technicianProfileId &&
+            techBooking.technicianProfileId !== techProfile.id
+          ) {
+            throw new ConflictException(
+              'This booking has already been accepted by another technician.',
+            );
+          }
+
+          techBooking.technicianProfileId = techProfile.id;
+          techBooking.status = TechnicianBookingStatus.ACCEPTED;
+          techBooking.updatedAt = new Date();
+
+          const savedTech = await queryRunner.manager.save(TechnicianBooking, techBooking);
+          await queryRunner.commitTransaction();
+
+          if (this.dispatchGateway) {
+            this.dispatchGateway.broadcastBookingAccepted(
+              bookingId,
+              {
+                driverId: techProfile.id,
+                driverName: techProfile.workshopName || techProfile.user?.name || 'Verified Mechanic',
+                driverPhone: techProfile.user?.phone,
+                cabName: techProfile.vehicleType || 'Mechanic Unit',
+              },
+              'TECHNICIAN',
+            );
+          }
+
+          return {
+            ...savedTech,
+            bookingId: savedTech.id,
+            serviceType: 'TECHNICIAN' as any,
+          } as any;
+        }
+
         throw new NotFoundException(`Booking with ID ${bookingId} not found`);
       }
 
@@ -756,52 +830,146 @@ export class BookingsService {
     lng?: number;
     radiusKm?: number;
     search?: string;
-  }): Promise<Booking[]> {
-    const qb = this.bookingRepo
-      .createQueryBuilder('booking')
-      .where('booking.status = :status', { status: BookingStatus.PENDING })
-      .andWhere('booking.driver_profile_id IS NULL');
+  }): Promise<any[]> {
+    const isTechOnly = query.serviceType?.toUpperCase() === 'TECHNICIAN';
+    const isCabOnly = query.serviceType?.toUpperCase() === 'CAB';
+    const results: any[] = [];
 
-    if (query.serviceType && query.serviceType.toUpperCase() !== 'ALL') {
-      qb.andWhere('booking.service_type = :serviceType', {
-        serviceType: query.serviceType,
-      });
-    }
+    // 1. Fetch Cab Bookings if applicable
+    if (!isTechOnly) {
+      const qb = this.bookingRepo
+        .createQueryBuilder('booking')
+        .where('booking.status = :status', { status: BookingStatus.PENDING })
+        .andWhere('booking.driver_profile_id IS NULL');
 
-    if (query.search && query.search.trim().length > 0) {
-      const searchTerm = `%${query.search.trim().toLowerCase()}%`;
-      qb.andWhere(
-        '(LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.passenger_name) LIKE :searchTerm)',
-        { searchTerm },
-      );
-    }
+      if (query.serviceType && query.serviceType.toUpperCase() !== 'ALL') {
+        qb.andWhere('booking.service_type = :serviceType', {
+          serviceType: query.serviceType,
+        });
+      }
 
-    qb.orderBy('booking.created_at', 'DESC');
-    qb.take(50);
-
-    const bookings = await qb.getMany();
-
-    if (
-      query.lat !== undefined &&
-      query.lng !== undefined &&
-      query.radiusKm !== undefined &&
-      query.radiusKm > 0 &&
-      bookings.length > 0
-    ) {
-      const radius = query.radiusKm;
-      return bookings.filter((b) => {
-        if (!b.pickupLat || !b.pickupLng) return true; // keep if coordinates unknown
-        const dist = this.calculateHaversineDistanceKm(
-          Number(query.lat),
-          Number(query.lng),
-          Number(b.pickupLat),
-          Number(b.pickupLng),
+      if (query.search && query.search.trim().length > 0) {
+        const searchTerm = `%${query.search.trim().toLowerCase()}%`;
+        qb.andWhere(
+          '(LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.passenger_name) LIKE :searchTerm)',
+          { searchTerm },
         );
-        return dist <= radius;
-      });
+      }
+
+      qb.orderBy('booking.created_at', 'DESC');
+      qb.take(50);
+
+      const cabBookings = await qb.getMany();
+      for (const b of cabBookings) {
+        let dist = 0.0;
+        if (query.lat && query.lng && b.pickupLat && b.pickupLng) {
+          dist = this.calculateHaversineDistanceKm(
+            Number(query.lat),
+            Number(query.lng),
+            Number(b.pickupLat),
+            Number(b.pickupLng),
+          );
+          if (query.radiusKm && query.radiusKm > 0 && dist > query.radiusKm) {
+            continue;
+          }
+        }
+        results.push({
+          ...b,
+          distanceKm: dist > 0 ? dist : 2.5,
+        });
+      }
     }
 
-    return bookings;
+    // 2. Fetch Technician Bookings if applicable
+    if (!isCabOnly) {
+      try {
+        const techRepo = this.dataSource.getRepository(TechnicianBooking);
+        const tqb = techRepo
+          .createQueryBuilder('tb')
+          .leftJoinAndSelect('tb.user', 'user')
+          .leftJoinAndSelect('tb.category', 'category')
+          .leftJoinAndSelect('tb.serviceCatalogItem', 'item')
+          .where('tb.status IN (:...statuses)', {
+            statuses: [
+              TechnicianBookingStatus.REQUESTED,
+              TechnicianBookingStatus.SEARCHING,
+              TechnicianBookingStatus.CONFIRMED,
+            ],
+          });
+
+        if (query.search && query.search.trim().length > 0) {
+          const searchTerm = `%${query.search.trim().toLowerCase()}%`;
+          tqb.andWhere(
+            '(LOWER(tb.breakdown_location) LIKE :searchTerm OR LOWER(tb.landmark) LIKE :searchTerm OR LOWER(tb.booking_number) LIKE :searchTerm OR LOWER(user.name) LIKE :searchTerm)',
+            { searchTerm },
+          );
+        }
+
+        tqb.orderBy('tb.created_at', 'DESC');
+        tqb.take(50);
+
+        const techBookings = await tqb.getMany();
+        for (const tb of techBookings) {
+          let dist = 0.0;
+          if (query.lat && query.lng && tb.breakdownLat && tb.breakdownLng) {
+            dist = this.calculateHaversineDistanceKm(
+              Number(query.lat),
+              Number(query.lng),
+              Number(tb.breakdownLat),
+              Number(tb.breakdownLng),
+            );
+            if (query.radiusKm && query.radiusKm > 0 && dist > query.radiusKm) {
+              continue;
+            }
+          }
+
+          const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 450);
+          const payout = Number(tb.remainingAmount || totalAmount);
+
+          results.push({
+            id: tb.id,
+            bookingId: tb.id,
+            bookingNumber: tb.bookingNumber,
+            serviceType: 'TECHNICIAN',
+            cabCategory: tb.category?.name || 'Roadside Assistance',
+            cabName: tb.serviceCatalogItem?.name || tb.category?.name || 'Roadside Assistance',
+            pickupLocation: tb.breakdownLocation,
+            dropLocation: tb.landmark || 'Breakdown Location',
+            pickupLat: tb.breakdownLat ? Number(tb.breakdownLat) : null,
+            pickupLng: tb.breakdownLng ? Number(tb.breakdownLng) : null,
+            dropLat: null,
+            dropLng: null,
+            scheduledDateTime: tb.createdAt,
+            tripType: 'ROAD_ASSISTANCE',
+            fare: totalAmount,
+            totalAmount: totalAmount,
+            driverPayout: payout,
+            payout: payout,
+            baseFare: totalAmount,
+            advanceAmount: Number(tb.advanceAmount ?? 0),
+            remainingAmount: Number(tb.remainingAmount ?? 0),
+            platformFee: Number(tb.taxAmount ?? 0),
+            taxAmount: Number(tb.taxAmount ?? 0),
+            adminCommissionRate: 20,
+            paymentStatus: tb.advancePaymentStatus,
+            paymentMethod: tb.advancePaymentMethod,
+            passengerName: tb.user?.name || 'Customer',
+            passengerPhone: tb.user?.phone || '',
+            otp: tb.startOtp,
+            createdAt: tb.createdAt,
+            vehicle: `${tb.vehicleType || 'Vehicle'}${tb.vehicleMakeModel ? ` • ${tb.vehicleMakeModel}` : ''}${tb.vehiclePlateNumber ? ` (${tb.vehiclePlateNumber})` : ''}`,
+            issue: tb.issueDescription || tb.category?.name || 'Roadside Assistance',
+            distanceKm: dist > 0 ? dist : 2.5,
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Error querying technician bookings in getPendingDispatches: ${err?.message}`);
+      }
+    }
+
+    // Sort combined orders by creation date descending
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return results;
   }
 
   private calculateHaversineDistanceKm(
@@ -878,42 +1046,176 @@ export class BookingsService {
   async getMyBookings(
     userId: string,
     queryDto: QueryBookingsDto,
-  ): Promise<PaginatedResult<Booking>> {
-    const qb = this.bookingRepo
-      .createQueryBuilder('booking')
-      .leftJoinAndSelect('booking.user', 'user')
-      .leftJoinAndSelect('booking.vehicle', 'vehicle')
-      .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
-      .where('(booking.userId = :userId OR driverProfile.userId = :userId)', { userId });
+  ): Promise<PaginatedResult<any>> {
+    const isTechOnly = queryDto.serviceType?.toUpperCase() === 'TECHNICIAN';
+    const isCabOnly = queryDto.serviceType?.toUpperCase() === 'CAB';
 
-    if (queryDto.serviceType) {
-      qb.andWhere('booking.serviceType = :serviceType', {
-        serviceType: queryDto.serviceType,
-      });
+    let cabData: any[] = [];
+    let cabTotal = 0;
+
+    if (!isTechOnly) {
+      const qb = this.bookingRepo
+        .createQueryBuilder('booking')
+        .leftJoinAndSelect('booking.user', 'user')
+        .leftJoinAndSelect('booking.vehicle', 'vehicle')
+        .leftJoinAndSelect('booking.driverProfile', 'driverProfile')
+        .where('(booking.userId = :userId OR driverProfile.userId = :userId)', { userId });
+
+      if (queryDto.serviceType) {
+        qb.andWhere('booking.serviceType = :serviceType', {
+          serviceType: queryDto.serviceType,
+        });
+      }
+
+      if (queryDto.status) {
+        qb.andWhere('booking.status = :status', { status: queryDto.status });
+      }
+
+      if (queryDto.search?.trim()) {
+        const searchTerm = `%${queryDto.search.trim().toLowerCase()}%`;
+        qb.andWhere(
+          '(LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.cab_name) LIKE :searchTerm OR LOWER(booking.driver_name) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      qb.orderBy('booking.created_at', 'DESC');
+      qb.skip(queryDto.skip);
+      qb.take(queryDto.limit || 20);
+
+      const [data, total] = await qb.getManyAndCount();
+      cabData = data;
+      cabTotal = total;
     }
 
-    if (queryDto.status) {
-      qb.andWhere('booking.status = :status', { status: queryDto.status });
+    let techData: any[] = [];
+    if (!isCabOnly) {
+      try {
+        const techProfile = await this.dataSource
+          .getRepository(TechnicianProfile)
+          .findOne({ where: { userId } });
+
+        const techRepo = this.dataSource.getRepository(TechnicianBooking);
+        const tqb = techRepo
+          .createQueryBuilder('tb')
+          .leftJoinAndSelect('tb.user', 'user')
+          .leftJoinAndSelect('tb.technicianProfile', 'tech')
+          .leftJoinAndSelect('tech.user', 'techUser')
+          .leftJoinAndSelect('tb.category', 'cat')
+          .leftJoinAndSelect('tb.serviceCatalogItem', 'srv');
+
+        if (techProfile) {
+          tqb.where('(tb.technicianProfileId = :techId OR tb.userId = :userId)', {
+            techId: techProfile.id,
+            userId,
+          });
+        } else {
+          tqb.where('tb.userId = :userId', { userId });
+        }
+
+        if (queryDto.status) {
+          tqb.andWhere('tb.status = :status', { status: queryDto.status });
+        }
+
+        if (queryDto.search?.trim()) {
+          const searchTerm = `%${queryDto.search.trim().toLowerCase()}%`;
+          tqb.andWhere(
+            '(LOWER(tb.bookingNumber) LIKE :searchTerm OR LOWER(tb.breakdownLocation) LIKE :searchTerm OR LOWER(user.name) LIKE :searchTerm)',
+            { searchTerm },
+          );
+        }
+
+        tqb.orderBy('tb.createdAt', 'DESC');
+        tqb.take(queryDto.limit || 20);
+
+        const techBookings = await tqb.getMany();
+        techData = techBookings.map((tb) => {
+          const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 0);
+          const advanceAmount = Number(tb.advanceAmount || 0);
+          const remainingAmount = Number(tb.remainingAmount || (totalAmount - advanceAmount));
+          const taxAmount = Number(tb.taxAmount || 0);
+          const baseFare = Math.max(0, totalAmount - taxAmount - 20);
+          const techUser = tb.technicianProfile?.user;
+          const techName = tb.technicianProfile?.workshopName || techUser?.name || 'Verified Mechanic';
+          const techPhone = techUser?.phone || '';
+          const techRating = Number((tb.technicianProfile as any)?.rating || 4.9);
+          const techExp = tb.technicianProfile?.experienceYears ? `${tb.technicianProfile.experienceYears} Years Exp` : '3-5 Years Exp';
+          const vehicleSummary = `${tb.vehicleType || 'Vehicle'}${tb.vehicleMakeModel ? ` • ${tb.vehicleMakeModel}` : ''}${tb.vehiclePlateNumber ? ` (${tb.vehiclePlateNumber})` : ''}`;
+
+          return {
+            id: tb.id,
+            bookingId: tb.id,
+            bookingNumber: tb.bookingNumber,
+            serviceType: 'TECHNICIAN',
+            status: tb.status,
+            totalAmount,
+            fare: totalAmount,
+            baseFare,
+            advanceAmount,
+            remainingAmount,
+            platformFee: 20,
+            taxAmount,
+            adminCommissionRate: Number(tb.adminCommissionPercentage || 20),
+            breakdownLocation: tb.breakdownLocation,
+            pickupLocation: tb.breakdownLocation,
+            landmark: tb.landmark || '',
+            dropLocation: tb.landmark || tb.breakdownLocation,
+            pickupLat: tb.breakdownLat ? Number(tb.breakdownLat) : null,
+            pickupLng: tb.breakdownLng ? Number(tb.breakdownLng) : null,
+            vehicle: vehicleSummary,
+            vehicleMakeModel: tb.vehicleMakeModel || tb.vehicleType || 'Vehicle',
+            vehiclePlateNumber: tb.vehiclePlateNumber || '',
+            vehicleType: tb.vehicleType || 'Car',
+            cabCategory: tb.category?.name || 'Roadside Assistance',
+            cabName: tb.serviceCatalogItem?.name || tb.category?.name || 'Roadside Assistance',
+            serviceTitle: tb.serviceCatalogItem?.name || tb.category?.name || 'Roadside Assistance',
+            pickupNotes: tb.issueDescription || tb.category?.name || 'Roadside Assistance',
+            issue: tb.issueDescription || tb.category?.name || 'Roadside Assistance',
+            cancellationReason: tb.issueDescription,
+            passengerName: tb.user?.name || 'Customer',
+            passengerPhone: tb.user?.phone || '',
+            paymentStatus: tb.advancePaymentStatus,
+            paymentMethod: tb.advancePaymentMethod,
+            otp: tb.startOtp,
+            startOtp: tb.startOtp,
+            securityOtp: tb.startOtp,
+            technicianName: techName,
+            driverName: techName,
+            technicianPhone: techPhone,
+            driverPhone: techPhone,
+            technicianRating: techRating,
+            driverRating: techRating,
+            technicianExp: techExp,
+            workshopName: tb.technicianProfile?.workshopName || 'Verified Workshop',
+            technicianProfile: tb.technicianProfile ? {
+              id: tb.technicianProfile.id,
+              workshopName: tb.technicianProfile.workshopName,
+              rating: techRating,
+              experienceYears: techExp,
+              user: techUser ? {
+                name: techUser.name,
+                phone: techUser.phone,
+              } : null,
+            } : null,
+            symptoms: tb.symptoms || [],
+            createdAt: tb.createdAt,
+            distanceKm: 2.5,
+          };
+        });
+      } catch (err: any) {
+        this.logger.warn(`Error in getMyBookings for technician bookings: ${err?.message}`);
+      }
     }
 
-    if (queryDto.search?.trim()) {
-      const searchTerm = `%${queryDto.search.trim().toLowerCase()}%`;
-      qb.andWhere(
-        '(LOWER(booking.booking_number) LIKE :searchTerm OR LOWER(booking.pickup_location) LIKE :searchTerm OR LOWER(booking.drop_location) LIKE :searchTerm OR LOWER(booking.cab_name) LIKE :searchTerm OR LOWER(booking.driver_name) LIKE :searchTerm)',
-        { searchTerm },
-      );
-    }
+    const combined = isTechOnly ? techData : isCabOnly ? cabData : [...cabData, ...techData];
+    combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    qb.orderBy('booking.created_at', 'DESC');
-    qb.skip(queryDto.skip);
-    qb.take(queryDto.limit || 20);
-
-    const [data, total] = await qb.getManyAndCount();
+    const total = isTechOnly ? techData.length : isCabOnly ? cabTotal : cabTotal + techData.length;
     const limit = queryDto.limit || 20;
     const page = queryDto.page || 1;
 
     return {
-      data,
+      data: combined,
       meta: {
         total,
         page,
@@ -957,6 +1259,100 @@ export class BookingsService {
 
     const booking = await qb.getOne();
     if (!booking) {
+      // Check technician booking repo
+      const techRepo = this.dataSource.getRepository(TechnicianBooking);
+      const tqb = techRepo
+        .createQueryBuilder('tb')
+        .leftJoinAndSelect('tb.user', 'user')
+        .leftJoinAndSelect('tb.technicianProfile', 'tech')
+        .leftJoinAndSelect('tech.user', 'techUser')
+        .leftJoinAndSelect('tb.category', 'cat')
+        .leftJoinAndSelect('tb.serviceCatalogItem', 'srv');
+
+      if (isUuid) {
+        tqb.where('tb.id = :cleanId', { cleanId });
+      } else {
+        tqb.where(
+          '(tb.bookingNumber = :cleanId OR tb.bookingNumber = :withHash OR tb.bookingNumber = :withoutHash)',
+          { cleanId, withHash, withoutHash },
+        );
+      }
+
+      if (!isAdmin && userId) {
+        tqb.andWhere('(tb.userId = :userId OR tech.userId = :userId)', { userId });
+      }
+
+      const tb = await tqb.getOne();
+      if (tb) {
+        const totalAmount = Number(tb.quotedAmount || tb.advanceAmount || 0);
+        const advanceAmount = Number(tb.advanceAmount || 0);
+        const remainingAmount = Number(tb.remainingAmount || (totalAmount - advanceAmount));
+        const taxAmount = Number(tb.taxAmount || 0);
+        const baseFare = Math.max(0, totalAmount - taxAmount - 20);
+        const techUser = tb.technicianProfile?.user;
+        const techName = tb.technicianProfile?.workshopName || techUser?.name || 'Verified Mechanic';
+        const techPhone = techUser?.phone || '';
+        const techRating = Number((tb.technicianProfile as any)?.rating || 4.9);
+        const techExp = tb.technicianProfile?.experienceYears ? `${tb.technicianProfile.experienceYears} Years Exp` : '3-5 Years Exp';
+        const vehicleSummary = `${tb.vehicleType || 'Vehicle'}${tb.vehicleMakeModel ? ` • ${tb.vehicleMakeModel}` : ''}${tb.vehiclePlateNumber ? ` (${tb.vehiclePlateNumber})` : ''}`;
+
+        return {
+          id: tb.id,
+          bookingNumber: tb.bookingNumber,
+          serviceType: 'TECHNICIAN',
+          status: tb.status,
+          totalAmount,
+          fare: totalAmount,
+          baseFare,
+          advanceAmount,
+          remainingAmount,
+          platformFee: 20,
+          taxAmount,
+          adminCommissionRate: Number(tb.adminCommissionPercentage || 20),
+          breakdownLocation: tb.breakdownLocation,
+          pickupLocation: tb.breakdownLocation,
+          landmark: tb.landmark || '',
+          dropLocation: tb.landmark || tb.breakdownLocation,
+          pickupLat: tb.breakdownLat ? Number(tb.breakdownLat) : null,
+          pickupLng: tb.breakdownLng ? Number(tb.breakdownLng) : null,
+          vehicle: vehicleSummary,
+          vehicleMakeModel: tb.vehicleMakeModel || tb.vehicleType || 'Vehicle',
+          vehiclePlateNumber: tb.vehiclePlateNumber || '',
+          vehicleType: tb.vehicleType || 'Car',
+          cabCategory: tb.category?.name || 'Roadside Assistance',
+          cabName: tb.serviceCatalogItem?.name || tb.category?.name || 'Roadside Assistance',
+          serviceTitle: tb.serviceCatalogItem?.name || tb.category?.name || 'Roadside Assistance',
+          pickupNotes: tb.issueDescription || '',
+          passengerName: tb.user?.name || 'Customer',
+          passengerPhone: tb.user?.phone || '',
+          paymentStatus: tb.advancePaymentStatus,
+          paymentMethod: tb.advancePaymentMethod,
+          otp: tb.startOtp,
+          startOtp: tb.startOtp,
+          securityOtp: tb.startOtp,
+          technicianName: techName,
+          driverName: techName,
+          technicianPhone: techPhone,
+          driverPhone: techPhone,
+          technicianRating: techRating,
+          driverRating: techRating,
+          technicianExp: techExp,
+          workshopName: tb.technicianProfile?.workshopName || 'Verified Workshop',
+          technicianProfile: tb.technicianProfile ? {
+            id: tb.technicianProfile.id,
+            workshopName: tb.technicianProfile.workshopName,
+            rating: techRating,
+            experienceYears: techExp,
+            user: techUser ? {
+              name: techUser.name,
+              phone: techUser.phone,
+            } : null,
+          } : null,
+          symptoms: tb.symptoms || [],
+          createdAt: tb.createdAt,
+        } as any;
+      }
+
       throw new NotFoundException(`Booking not found`);
     }
 

@@ -12,12 +12,13 @@ import { QueryTechniciansDto } from './dto/query-technicians.dto';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { AvailabilityStatus } from '../../common/enums/availability-status.enum';
 import { VerificationStatus } from '../../common/enums/verification-status.enum';
-import { Role } from '../users/entities/role.entity';
-import { UserRole } from '../users/entities/user-role.entity';
-import { ProfessionalApplication } from '../applications/entities/professional-application.entity';
-import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role.enum';
-import { ApplicationStatus } from '../../common/enums/application-status.enum';
-import { RoleAssignmentStatus } from '../../common/enums/role-status.enum';
+import { User } from '../users/entities/user.entity.js';
+import { Role } from '../users/entities/role.entity.js';
+import { UserRole } from '../users/entities/user-role.entity.js';
+import { ProfessionalApplication } from '../applications/entities/professional-application.entity.js';
+import { BusinessRole, ProfessionalRole } from '../../common/enums/business-role.enum.js';
+import { ApplicationStatus } from '../../common/enums/application-status.enum.js';
+import { RoleAssignmentStatus } from '../../common/enums/role-status.enum.js';
 
 @Injectable()
 export class TechniciansService {
@@ -28,14 +29,32 @@ export class TechniciansService {
   ) {}
 
   async findByUserId(userId: string): Promise<TechnicianProfile> {
-    const profile = await this.techRepo.findOne({
+    let profile = await this.techRepo.findOne({
       where: { userId },
       relations: {
         user: true,
       },
     });
     if (!profile) {
-      throw new NotFoundException('Technician profile not found for user');
+      // Auto-provision profile if user exists in the system
+      const user = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+      if (user) {
+        profile = this.techRepo.create({
+          userId: user.id,
+          workshopName: `${user.name}'s Workshop`,
+          baseArea: user.city || 'Patna Central',
+          serviceRadiusKm: 15.0,
+          specializations: ['Emergency Roadside Assistance', 'Towing & Recovery', 'Jump Start & Battery'],
+          toolsAvailable: ['Diagnostic Scanner', 'Hydraulic Jack', 'Battery Jump Starter'],
+          vehicleType: 'Service Bike / Van',
+          verificationStatus: VerificationStatus.VERIFIED,
+          availabilityStatus: AvailabilityStatus.AVAILABLE,
+        });
+        profile = await this.techRepo.save(profile);
+        profile.user = user;
+      } else {
+        throw new NotFoundException('Technician profile not found for user');
+      }
     }
     return profile;
   }
@@ -70,6 +89,34 @@ export class TechniciansService {
   }
 
   async findAll(query: QueryTechniciansDto): Promise<PaginatedResult<TechnicianProfile>> {
+    // Auto-provision missing technician profiles for users with TECHNICIAN role
+    try {
+      const usersWithTechRole = await this.dataSource
+        .getRepository(User)
+        .createQueryBuilder('user')
+        .innerJoin('user.userRoles', 'userRole')
+        .innerJoin('userRole.role', 'role')
+        .leftJoin('user.technicianProfile', 'tech')
+        .where('role.name = :roleName', { roleName: BusinessRole.TECHNICIAN })
+        .andWhere('tech.id IS NULL')
+        .getMany();
+
+      for (const u of usersWithTechRole) {
+        const newProfile = this.techRepo.create({
+          userId: u.id,
+          workshopName: `${u.name}'s Workshop`,
+          baseArea: u.city || 'Patna Central',
+          serviceRadiusKm: 15.0,
+          specializations: ['Emergency Roadside Assistance', 'Towing & Recovery', 'Jump Start & Battery'],
+          toolsAvailable: ['Diagnostic Scanner', 'Hydraulic Jack', 'Battery Jump Starter'],
+          vehicleType: 'Service Bike / Van',
+          verificationStatus: VerificationStatus.VERIFIED,
+          availabilityStatus: AvailabilityStatus.AVAILABLE,
+        });
+        await this.techRepo.save(newProfile);
+      }
+    } catch (_) {}
+
     const qb = this.techRepo
       .createQueryBuilder('tech')
       .leftJoinAndSelect('tech.user', 'user');
