@@ -147,29 +147,11 @@ export class TechnicianBookingsService {
         }
 
         taxAmount = 0.0;
-        const activeTaxes = await manager.find(Tax, {
-          where: { isActive: true },
-        });
-        const applicableTaxes = activeTaxes.filter(
-          (t) =>
-            t.applicableOn === TaxScope.ALL_SERVICES ||
-            t.applicableOn === TaxScope.TECHNICIAN,
-        );
-        for (const t of applicableTaxes) {
-          if (t.taxType === TaxType.PERCENTAGE) {
-            taxAmount += Math.round((quotedAmount * Number(t.rate)) / 100);
-          } else {
-            taxAmount += Math.round(Number(t.rate));
-          }
-        }
-
         const adminCommissionAmount = Number(
           ((quotedAmount * adminCommissionPercentage) / 100).toFixed(2),
         );
-        // Tax & Platform fee are added to advance commission (collected by admin)
-        advanceAmount = Number((adminCommissionAmount + taxAmount).toFixed(2));
-        // Remaining balance left for mechanic is exactly base price minus commission
-        remainingAmount = Number((quotedAmount - adminCommissionAmount).toFixed(2));
+        advanceAmount = Math.round(adminCommissionAmount);
+        remainingAmount = Number((quotedAmount - advanceAmount).toFixed(2));
         quotationStatus = QuotationStatus.NOT_REQUIRED;
 
         const txId = dto.paymentTransactionId || (dto as any).advancePaymentTransactionId;
@@ -267,8 +249,11 @@ export class TechnicianBookingsService {
       throw new ForbiddenException('Only verified technicians can accept jobs');
     }
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookingId.trim());
     const booking = await this.bookingRepo.findOne({
-      where: { id: bookingId },
+      where: isUuid
+        ? [{ id: bookingId.trim() }, { bookingNumber: bookingId.trim() }]
+        : [{ bookingNumber: bookingId.trim() }, { bookingNumber: `#${bookingId.trim()}` }],
     });
     if (!booking) {
       throw new NotFoundException(`Booking not found with ID ${bookingId}`);
@@ -317,8 +302,11 @@ export class TechnicianBookingsService {
       throw new ForbiddenException('Only verified technicians can submit quotes');
     }
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookingId.trim());
     const booking = await this.bookingRepo.findOne({
-      where: { id: bookingId },
+      where: isUuid
+        ? [{ id: bookingId.trim() }, { bookingNumber: bookingId.trim() }]
+        : [{ bookingNumber: bookingId.trim() }, { bookingNumber: `#${bookingId.trim()}` }],
     });
     if (!booking) {
       throw new NotFoundException(`Booking not found with ID ${bookingId}`);
@@ -331,34 +319,18 @@ export class TechnicianBookingsService {
     const adminCommissionPercentage = await this.getCommissionPercentage();
     const quotedAmount = Number(dto.quotedAmount);
 
-    let taxAmount = 0.0;
-    const activeTaxes = await this.dataSource.getRepository(Tax).find({
-      where: { isActive: true },
-    });
-    const applicableTaxes = activeTaxes.filter(
-      (t) =>
-        t.applicableOn === TaxScope.ALL_SERVICES ||
-        t.applicableOn === TaxScope.TECHNICIAN,
-    );
-    for (const t of applicableTaxes) {
-      if (t.taxType === TaxType.PERCENTAGE) {
-        taxAmount += Math.round((quotedAmount * Number(t.rate)) / 100);
-      } else {
-        taxAmount += Math.round(Number(t.rate));
-      }
-    }
-
     const adminCommissionAmount = Number(
       ((quotedAmount * adminCommissionPercentage) / 100).toFixed(2),
     );
-    // Taxes added to advance commission
-    const advanceAmount = Number((adminCommissionAmount + taxAmount).toFixed(2));
-    const remainingAmount = Number((quotedAmount - adminCommissionAmount).toFixed(2));
+    // Dynamic all-inclusive quotation: advance is strictly 20% platform commission, 80% balance for mechanic
+    const advanceAmount = Math.round(adminCommissionAmount);
+    const remainingAmount = Number((quotedAmount - advanceAmount).toFixed(2));
+    const taxAmount = 0.0;
 
     booking.technicianProfileId = profile.id;
     booking.quotedAmount = quotedAmount;
     booking.taxAmount = taxAmount;
-    booking.quotationNotes = dto.quotationNotes;
+    booking.quotationNotes = dto.quotationNotes?.trim() || 'On-site diagnostic inspection and repair';
     booking.technicianNotes = dto.technicianNotes || booking.technicianNotes;
     booking.adminCommissionPercentage = adminCommissionPercentage;
     booking.advanceAmount = advanceAmount;
@@ -367,7 +339,16 @@ export class TechnicianBookingsService {
     booking.quotationStatus = QuotationStatus.QUOTED;
     booking.status = TechnicianBookingStatus.QUOTATION_SUBMITTED;
 
-    return this.bookingRepo.save(booking);
+    const saved = await this.bookingRepo.save(booking);
+
+    try {
+      this.dispatchGateway?.broadcastBookingStatusUpdated(
+        saved.id,
+        TechnicianBookingStatus.QUOTATION_SUBMITTED,
+      );
+    } catch (_) {}
+
+    return saved;
   }
 
   // ==================== 4. CUSTOMER ACCEPTS QUOTE & PAYS ADVANCE ====================
@@ -377,8 +358,11 @@ export class TechnicianBookingsService {
     userId: string,
     dto: AcceptQuotationDto,
   ): Promise<TechnicianBooking> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookingId.trim());
     const booking = await this.bookingRepo.findOne({
-      where: { id: bookingId },
+      where: isUuid
+        ? [{ id: bookingId.trim() }, { bookingNumber: bookingId.trim() }]
+        : [{ bookingNumber: bookingId.trim() }, { bookingNumber: `#${bookingId.trim()}` }],
     });
     if (!booking) {
       throw new NotFoundException(`Booking not found with ID ${bookingId}`);
@@ -402,7 +386,20 @@ export class TechnicianBookingsService {
     booking.customerNotes = dto.customerNotes || booking.customerNotes;
     booking.status = TechnicianBookingStatus.CONFIRMED;
 
-    return this.bookingRepo.save(booking);
+    if (!booking.startOtp) {
+      booking.startOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    const saved = await this.bookingRepo.save(booking);
+
+    try {
+      this.dispatchGateway?.broadcastBookingStatusUpdated(
+        saved.id,
+        TechnicianBookingStatus.CONFIRMED,
+      );
+    } catch (_) {}
+
+    return saved;
   }
 
   // ==================== 5. STATUS PROGRESSION (EN_ROUTE / ARRIVED) ====================
@@ -419,8 +416,11 @@ export class TechnicianBookingsService {
       throw new ForbiddenException('Unauthorized technician');
     }
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookingId.trim());
     const booking = await this.bookingRepo.findOne({
-      where: { id: bookingId },
+      where: isUuid
+        ? [{ id: bookingId.trim() }, { bookingNumber: bookingId.trim() }]
+        : [{ bookingNumber: bookingId.trim() }, { bookingNumber: `#${bookingId.trim()}` }],
     });
     if (!booking) {
       throw new NotFoundException(`Booking not found with ID ${bookingId}`);

@@ -51,6 +51,16 @@ export class ReviewsController {
     return this.reviewsService.createReview(dto, reviewerId);
   }
 
+  @Get('my-summary')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get partner rating summary for currently authenticated user',
+  })
+  async getMySummary(@CurrentUser() user: CurrentUserDto) {
+    return this.reviewsService.getMySummary(user.userId);
+  }
+
   @Get('target/:targetId/summary')
   @ApiOperation({
     summary: 'Get target rating summary & analytics',

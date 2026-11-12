@@ -965,6 +965,10 @@ export class BookingsService {
             vehicle: `${tb.vehicleType || 'Vehicle'}${tb.vehicleMakeModel ? ` • ${tb.vehicleMakeModel}` : ''}${tb.vehiclePlateNumber ? ` (${tb.vehiclePlateNumber})` : ''}`,
             issue: tb.issueDescription || tb.category?.name || 'Roadside Assistance',
             distanceKm: dist > 0 ? dist : 2.5,
+            quotationStatus: tb.quotationStatus,
+            quotedAmount: Number(tb.quotedAmount || 0),
+            quotationNotes: tb.quotationNotes,
+            quoteStatus: tb.quotationStatus,
           });
         }
       } catch (err: any) {
@@ -1210,6 +1214,10 @@ export class BookingsService {
               } : null,
             } : null,
             symptoms: tb.symptoms || [],
+            quotationStatus: tb.quotationStatus,
+            quotedAmount: Number(tb.quotedAmount || 0),
+            quotationNotes: tb.quotationNotes,
+            quoteStatus: tb.quotationStatus,
             createdAt: tb.createdAt,
             distanceKm: 2.5,
           };
@@ -1368,6 +1376,10 @@ export class BookingsService {
             } : null,
           } : null,
           symptoms: tb.symptoms || [],
+          quotationStatus: tb.quotationStatus,
+          quotedAmount: Number(tb.quotedAmount || 0),
+          quotationNotes: tb.quotationNotes,
+          quoteStatus: tb.quotationStatus,
           createdAt: tb.createdAt,
         } as any;
       }

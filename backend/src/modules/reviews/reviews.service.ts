@@ -97,15 +97,27 @@ export class ReviewsService {
         // Check Technician Booking
         if (!isUuid(targetId)) {
           try {
-            const qb = queryRunner.manager.createQueryBuilder(TechnicianBooking, 'tb');
+            const cleanBId = dto.bookingId.trim().replace(/^#/, '');
+            const withHash = `#${cleanBId}`;
+            const qb = queryRunner.manager
+              .createQueryBuilder(TechnicianBooking, 'tb')
+              .leftJoinAndSelect('tb.technicianProfile', 'tp');
             if (isBookingUuid) {
-              qb.where('tb.id = :id OR tb.booking_number = :id', { id: dto.bookingId });
+              qb.where(
+                'tb.id = :id OR tb.booking_number = :id OR tb.booking_number = :cleanBId OR tb.booking_number = :withHash',
+                { id: dto.bookingId, cleanBId, withHash },
+              );
             } else {
-              qb.where('tb.booking_number = :id', { id: dto.bookingId });
+              qb.where(
+                'tb.booking_number = :cleanBId OR tb.booking_number = :withHash OR tb.id = :cleanBId',
+                { cleanBId, withHash },
+              );
             }
             const techBooking = await qb.getOne();
             if (techBooking) {
-              if (techBooking.technicianProfileId && isUuid(techBooking.technicianProfileId)) {
+              if (techBooking.technicianProfile?.userId && isUuid(techBooking.technicianProfile.userId)) {
+                targetId = techBooking.technicianProfile.userId;
+              } else if (techBooking.technicianProfileId && isUuid(techBooking.technicianProfileId)) {
                 targetId = techBooking.technicianProfileId;
               } else if (techBooking.userId && isUuid(techBooking.userId) && reviewerId !== techBooking.userId) {
                 targetId = techBooking.userId;
@@ -313,6 +325,96 @@ export class ReviewsService {
       distribution,
       topTags,
       recentReviews: reviews.slice(0, 5),
+    };
+  }
+
+  /**
+   * Get partner rating summary for currently authenticated user
+   */
+  async getMySummary(userId: string) {
+    const isUuid = (val?: string) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+    if (!isUuid(userId)) {
+      return {
+        averageRating: 5.0,
+        totalReviews: 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        recentReviews: [],
+      };
+    }
+
+    const targetIds: string[] = [userId];
+
+    try {
+      const techProfile = await this.dataSource.query(
+        `SELECT id FROM technician_profiles WHERE user_id = $1`,
+        [userId],
+      );
+      if (techProfile?.length > 0) {
+        for (const tp of techProfile) {
+          if (tp.id) targetIds.push(tp.id);
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const driverProfile = await this.dataSource.query(
+        `SELECT id FROM driver_profiles WHERE user_id = $1`,
+        [userId],
+      );
+      if (driverProfile?.length > 0) {
+        for (const dp of driverProfile) {
+          if (dp.id) targetIds.push(dp.id);
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const vehicles = await this.dataSource.query(
+        `SELECT id FROM vehicles WHERE user_id = $1`,
+        [userId],
+      );
+      if (vehicles?.length > 0) {
+        for (const v of vehicles) {
+          if (v.id) targetIds.push(v.id);
+        }
+      }
+    } catch (_) {}
+
+    const reviews = await this.reviewRepo
+      .createQueryBuilder('r')
+      .where(
+        '(r.target_id IN (:...targetIds) OR r.booking_id IN (SELECT booking_number FROM technician_bookings WHERE technician_profile_id IN (:...targetIds)) OR r.booking_id IN (SELECT id::text FROM technician_bookings WHERE technician_profile_id IN (:...targetIds)) OR r.booking_id IN (SELECT booking_number FROM bookings WHERE user_id = :userId OR driver_profile_id IN (:...targetIds)))',
+        { targetIds, userId },
+      )
+      .orderBy('r.createdAt', 'DESC')
+      .take(100)
+      .getMany();
+
+    if (!reviews || reviews.length === 0) {
+      return {
+        averageRating: 5.0,
+        totalReviews: 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        recentReviews: [],
+      };
+    }
+
+    let sum = 0;
+    const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const r of reviews) {
+      sum += r.rating;
+      distribution[r.rating] = (distribution[r.rating] || 0) + 1;
+    }
+
+    const averageRating = parseFloat((sum / reviews.length).toFixed(1));
+    return {
+      averageRating,
+      totalReviews: reviews.length,
+      distribution,
+      recentReviews: reviews.slice(0, 10),
     };
   }
 

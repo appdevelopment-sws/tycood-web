@@ -4,7 +4,7 @@ import { IsNumber, Min, IsString, IsNotEmpty, IsOptional } from 'class-validator
 export class SubmitQuotationDto {
   @ApiProperty({ example: 4000.0, description: 'Total quotation amount in INR for the repair' })
   @IsNumber()
-  @Min(50)
+  @Min(50, { message: 'Quotation amount must be at least ₹50' })
   quotedAmount: number;
 
   @ApiProperty({
@@ -12,7 +12,7 @@ export class SubmitQuotationDto {
     description: 'Detailed explanation of work and parts included in quotation',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Diagnostic and repair notes are required' })
   quotationNotes: string;
 
   @ApiPropertyOptional({ example: 'Estimated repair time: 45 minutes' })
